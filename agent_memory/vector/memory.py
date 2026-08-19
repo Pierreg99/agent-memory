@@ -62,7 +62,7 @@ class VectorMemory:
 
     def query(self, q: MemoryQuery) -> list[MemoryEntry]:
         """Return up to q.top_k entries most similar to q.query_text."""
-        if not self._entries:
+        if not self._entries or q.top_k <= 0 or not q.query_text.strip():
             return []
 
         query_vec = np.asarray(self.embedder.embed_text(q.query_text), dtype=np.float32)
