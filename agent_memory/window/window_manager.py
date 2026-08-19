@@ -84,12 +84,9 @@ class WindowManager:
                 kept.append(m)
                 used += tc
             elif len(kept) < self.config.keep_last_turns:
-                # Reserve room to satisfy the keep_last_turns floor by
-                # precomputing the remaining budget.
-                remaining_budget = budget - used
-                if tc <= remaining_budget or not kept:
-                    kept.append(m)
-                    used += tc
+                # Satisfy the keep_last_turns minimum floor even when over budget
+                kept.append(m)
+                used += tc
             else:
                 break
         kept.reverse()

@@ -103,29 +103,42 @@ class AgentMemory:
         self.store.add_message(sid, msg)
         return msg
 
+    def _combine_metadata(
+        self,
+        metadata: Optional[dict[str, Any]] = None,
+        meta_kwargs: Optional[dict[str, Any]] = None,
+    ) -> Optional[dict[str, Any]]:
+        combined = dict(metadata) if metadata else {}
+        if meta_kwargs:
+            combined.update(meta_kwargs)
+        return combined or None
+
     def add_user(
         self,
         content: str,
         session_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
         **meta: Any,
     ) -> Message:
-        return self.add(Role.USER, content, session_id, meta or None)
+        return self.add(Role.USER, content, session_id, self._combine_metadata(metadata, meta))
 
     def add_assistant(
         self,
         content: str,
         session_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
         **meta: Any,
     ) -> Message:
-        return self.add(Role.ASSISTANT, content, session_id, meta or None)
+        return self.add(Role.ASSISTANT, content, session_id, self._combine_metadata(metadata, meta))
 
     def add_system(
         self,
         content: str,
         session_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
         **meta: Any,
     ) -> Message:
-        return self.add(Role.SYSTEM, content, session_id, meta or None)
+        return self.add(Role.SYSTEM, content, session_id, self._combine_metadata(metadata, meta))
 
     def add_long_term(
         self,
