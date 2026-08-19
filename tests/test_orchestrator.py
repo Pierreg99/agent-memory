@@ -123,3 +123,15 @@ def test_persistence_disabled_works():
     mem.add_user("hi")
     pack = mem.prepare("any")
     assert pack.recent_messages == []  # store is null
+
+
+def test_add_methods_with_metadata_and_kwargs():
+    mem = _make_mem()
+    msg_u = mem.add_user("Hello", metadata={"source": "web"}, user_ip="127.0.0.1")
+    assert msg_u.metadata == {"source": "web", "user_ip": "127.0.0.1"}
+
+    msg_a = mem.add_assistant("Hi there", latency_ms=42)
+    assert msg_a.metadata == {"latency_ms": 42}
+
+    msg_s = mem.add_system("System directive", priority="high")
+    assert msg_s.metadata == {"priority": "high"}

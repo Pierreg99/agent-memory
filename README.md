@@ -5,6 +5,8 @@ memory layer: token-aware context windowing, automatic summarization,
 RAG-style long-term recall, and durable persistence — all driven by
 YAML config.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 ## Quick start
 
 ```python
@@ -12,7 +14,7 @@ from agent_memory import AgentMemory
 
 mem = AgentMemory.from_config()        # loads defaults
 mem.add_system("You are a helpful assistant.")
-mem.add_user("Hi! I'm Alice and I love hiking.")
+mem.add_user("Hi! I'm Alice and I love hiking.", source="web")
 mem.add_long_term("User's name is Alice", importance=0.9)
 mem.add_long_term("User enjoys hiking", importance=0.7)
 
@@ -38,7 +40,7 @@ for cm in pack.to_chat_messages():
 - **Thread-safe**, **dependency-light** (only `pydantic`, `numpy`,
   `pyyaml`, `requests` are required; `tiktoken` and `sentence-transformers`
   are optional).
-- **Fully tested** — 48 unit + integration tests covering every module.
+- **Fully tested** — 50 unit + integration tests covering every module.
 
 ## Layout
 
@@ -63,10 +65,18 @@ agent_memory/                # Library package
 └── persistence/             # SQLite store
     └── store.py
 
-tests/                       # 48 unit + integration tests
+tests/                       # Unit + integration test suite
 examples/                    # Runnable end-to-end demo
 docs/architecture.md         # Detailed design notes
+ROADMAP.md                   # Product roadmap & progress plan
+CHANGELOG.md                 # Version release history
 ```
+
+## Documentation & Roadmap
+
+- **[Architecture Guide](docs/architecture.md)** — In-depth subsystem design, data flow, and extension points.
+- **[Roadmap & Progress Plan](ROADMAP.md)** — Completed features, current milestone status, and planned future releases.
+- **[Changelog](CHANGELOG.md)** — Version release history and patch notes.
 
 ## Installation
 
@@ -87,7 +97,7 @@ pip install -e .
 ```bash
 pip install pytest
 python -m pytest tests/ -v
-# 48 passed
+# 50 passed
 ```
 
 ## Configuration
