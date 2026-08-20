@@ -7,9 +7,8 @@ Two backends are provided:
   heuristic. Always available, zero external dependencies.
 
 * LLMSummarizer - a thin adapter that calls an OpenAI-compatible chat
-  completions endpoint. Falls back to a clear NotImplementedError if the
-  `requests` library is unavailable or the call fails, so callers can
-  gracefully fall back to extractive.
+  completions endpoint. Raises a clear RuntimeError if the API key is missing
+  or the call fails, so callers can gracefully fall back to extractive.
 
 A `Summarizer` Protocol is exported so users can plug in their own
 implementation (Claude, local LLM, etc.).
