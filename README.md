@@ -66,6 +66,9 @@ agent_memory/                # Library package
 tests/                       # 48 unit + integration tests
 examples/                    # Runnable end-to-end demo
 docs/architecture.md         # Detailed design notes
+CHANGELOG.md                 # Version history & release notes
+PROGRESS.md                  # Project completion matrix & test status
+ROADMAP.md                   # Future development plans & vision
 ```
 
 ## Installation
@@ -86,7 +89,7 @@ pip install -e .
 
 ```bash
 pip install pytest
-python -m pytest tests/ -v
+python3 -m pytest
 # 48 passed
 ```
 
@@ -105,6 +108,13 @@ mem = AgentMemory.from_config({
 
 See `agent_memory/config/defaults.yaml` for the full list of knobs and
 `docs/architecture.md` for the design rationale.
+
+## Documentation & Roadmap
+
+- **[Architecture Guide](docs/architecture.md)** — Architectural design principles and system data flow.
+- **[Changelog](CHANGELOG.md)** — Version release notes and notable changes.
+- **[Progress Matrix](PROGRESS.md)** — Subsystem completion matrix and test execution details.
+- **[Roadmap](ROADMAP.md)** — Short-term, mid-term, and long-term project roadmap.
 
 ## Demo
 
