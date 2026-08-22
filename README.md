@@ -40,6 +40,33 @@ for cm in pack.to_chat_messages():
   are optional).
 - **Fully tested** — 48 unit + integration tests covering every module.
 
+## Project Progress & Status
+
+| Module | Status | Highlights |
+|---|---|---|
+| **Orchestrator** | Complete | Unified `AgentMemory` facade, multi-turn state packing |
+| **Windowing & Budgeting** | Complete | Token budgeting, sliding / truncate / summarize-old strategies |
+| **Summarization** | Complete | Fast extractive keyword scoring + resilient LLM fallback |
+| **RAG Vector Memory** | Complete | In-process cosine similarity, feature hashing, sentence-transformers |
+| **Persistence** | Complete | Thread-safe SQLite store for messages, summaries, and facts |
+| **Configuration** | Complete | YAML default configs with runtime dict overrides |
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release history and updates.
+
+## Roadmap
+
+Future developments planned for `agent-memory`:
+
+- **v0.2.0 - External Vector Store Integrations**
+  - Adapters for ChromaDB, Qdrant, and FAISS for large-scale embedding search.
+- **v0.3.0 - Advanced Memory Consolidation & Decay**
+  - Automatic memory decay / pruning based on access frequency and time recency.
+  - Hierarchical summarization tree for ultra-long conversations.
+- **v0.4.0 - Async & Streaming Support**
+  - Async persistence methods (`aio-sqlite`) and non-blocking LLM summarizer calls.
+- **v0.5.0 - Multi-Tenant Memory Isolation & Access Control**
+  - First-class support for multi-user session management and scoping permissions.
+
 ## Layout
 
 ```
