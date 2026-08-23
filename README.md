@@ -106,6 +106,11 @@ mem = AgentMemory.from_config({
 See `agent_memory/config/defaults.yaml` for the full list of knobs and
 `docs/architecture.md` for the design rationale.
 
+## Project Progress & Roadmap
+
+- See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
+- See [ROADMAP.md](ROADMAP.md) for planned features and future directions.
+
 ## Demo
 
 ```bash

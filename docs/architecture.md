@@ -110,3 +110,5 @@ small, composable pieces:
   extractive heuristic drops important nuance.
 - **Swap the store** — when you need cross-process persistence,
   multi-tenant isolation, or a hosted database.
+
+For future enhancements, refer to [ROADMAP.md](../ROADMAP.md).
