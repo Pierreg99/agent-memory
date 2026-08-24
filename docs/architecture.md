@@ -1,8 +1,8 @@
 # Agent Memory System — Architecture
 
 A modular, configurable memory layer for LLM agents. Every LLM agent
-eventually needs four things, and this library provides all four as
-small, composable pieces:
+eventually needs core memory management components, and this library
+provides them as small, composable pieces:
 
 | Concern | Subsystem | Module |
 |---|---|---|

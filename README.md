@@ -112,6 +112,32 @@ See `agent_memory/config/defaults.yaml` for the full list of knobs and
 PYTHONPATH=. python examples/run_demo.py
 ```
 
+## Roadmap & Progress Plan
+
+### Completed (v0.1.0)
+- [x] **Core Orchestration**: Single entry point `AgentMemory` with `add_user`, `add_assistant`, `add_system`, `add_long_term`, and `prepare`.
+- [x] **Context Windowing**: Token-budget aware sliding, truncate-oldest, and summarize-old strategies.
+- [x] **Summarization Engine**: Zero-dependency extractive summarizer with keyword scoring + fallback-resilient LLM summarizer adapter.
+- [x] **Vector RAG Memory**: In-process cosine retrieval using deterministic feature hash embeddings or `sentence-transformers`.
+- [x] **Persistence Layer**: Thread-safe SQLite store with schema auto-initialization for ephemeral or file-backed usage.
+- [x] **Config & Reliability**: Deep-merge YAML configuration and 100% passing test suite (48 unit/integration tests).
+
+### Near-Term (v0.2.0)
+- [ ] **Async API Support**: First-class `async` methods (`aadd_user`, `aprepare`) for high-concurrency agent event loops.
+- [ ] **External Vector Store Adapters**: Pluggable integrations for FAISS, Qdrant, and Chroma vector backends.
+- [ ] **Hybrid Search**: Hybrid lexical (BM25) + dense vector recall for long-term facts.
+- [ ] **Expanded LLM Providers**: Dedicated summarization adapters for Anthropic Claude, Ollama, and local vLLM instances.
+
+### Long-Term (v1.0.0)
+- [ ] **Graph & Entity Memory**: Structured entity extraction and relationship tracking across multi-turn sessions.
+- [ ] **Memory Consolidation & Decay**: Automated periodic memory pruning, dynamic importance re-ranking, and fact deduplication.
+- [ ] **Multi-Agent Shared Memory**: Multi-tenant memory partitions with fine-grained access policies for multi-agent teams.
+- [ ] **Memory Inspection CLI**: Visual interactive inspector tool for session history, vector spaces, and summary provenance.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for full release history and version details.
+
 ## License
 
 MIT — see `LICENSE`.
