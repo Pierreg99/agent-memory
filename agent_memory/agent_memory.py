@@ -100,6 +100,8 @@ class AgentMemory:
             content=content,
             metadata=metadata or {},
         )
+        # Pre-compute and cache token count at ingestion time for performance optimization
+        msg.token_count = self.counter.count_text(content) + getattr(self.counter, "PER_MESSAGE_OVERHEAD", 3)
         self.store.add_message(sid, msg)
         return msg
 
@@ -237,6 +239,72 @@ class AgentMemory:
             used_tokens=result.used_tokens,
             budget_tokens=result.budget_tokens,
         )
+
+    # ---- agentic routines -----------------------------------------------
+
+    def consolidate_session(
+        self,
+        session_id: Optional[str] = None,
+        max_summary_tokens: int = 400,
+    ) -> Optional[MemoryEntry]:
+        """Consolidate the unsummarized context of a session into long-term summary.
+
+        Extracts key factual points from recent messages using the summarizer
+        and stores the result both in persistent store and vector memory.
+        """
+        sid = session_id or self.default_session
+        all_messages = self.store.get_messages(sid)
+        if not all_messages:
+            return None
+
+        summary_text, covered_ids = self.summarizer.summarize_messages(
+            all_messages, max_summary_tokens
+        )
+        if not summary_text:
+            return None
+
+        entry = to_memory_entry(summary_text, covered_ids, sid)
+        self.store.add_summary(sid, entry)
+        if self.vector is not None:
+            self.vector.add(entry)
+        return entry
+
+    def chat_turn(
+        self,
+        user_message: str,
+        session_id: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        assistant_responder: Optional[Any] = None,
+    ) -> tuple[MemoryPack, Optional[str]]:
+        """High-level agentic routine to handle a full chat turn.
+
+        1. Adds user message to memory.
+        2. Prepares context pack for LLM.
+        3. Optional: Executes assistant_responder callable (accepting pack or messages)
+           and automatically ingests the assistant's reply.
+        """
+        sid = session_id or self.default_session
+        self.add_user(user_message, session_id=sid)
+        pack = self.prepare(user_message, session_id=sid, system_prompt=system_prompt)
+
+        reply: Optional[str] = None
+        if assistant_responder is not None:
+            reply = assistant_responder(pack)
+            if reply:
+                self.add_assistant(reply, session_id=sid)
+        return pack, reply
+
+    def maintain_memory(
+        self,
+        decay_factor: float = 0.95,
+        min_importance: float = 0.1,
+    ) -> dict[str, int]:
+        """Perform agentic maintenance over vector memory (decay & prune)."""
+        if self.vector is None:
+            return {"pruned_count": 0, "remaining_count": 0}
+        self.vector.decay_importance(factor=decay_factor)
+        pruned = self.vector.prune_memories(min_importance=min_importance)
+        return {"pruned_count": pruned, "remaining_count": len(self.vector)}
 
     # ---- introspection --------------------------------------------------
 

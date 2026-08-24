@@ -58,6 +58,29 @@ class VectorMemory:
         self._entries.clear()
         self._vectors.clear()
 
+    def decay_importance(self, factor: float = 0.95) -> None:
+        """Decay the importance score of all entries by a constant factor."""
+        for entry in self._entries:
+            entry.importance *= factor
+
+    def prune_memories(self, min_importance: float = 0.1) -> int:
+        """Prune entries whose importance falls below min_importance.
+
+        Returns the count of pruned memories.
+        """
+        pruned_count = 0
+        new_entries: list[MemoryEntry] = []
+        new_vectors: list[np.ndarray] = []
+        for entry, vec in zip(self._entries, self._vectors):
+            if entry.importance < min_importance:
+                pruned_count += 1
+            else:
+                new_entries.append(entry)
+                new_vectors.append(vec)
+        self._entries = new_entries
+        self._vectors = new_vectors
+        return pruned_count
+
     # ---- query -----------------------------------------------------------
 
     def query(self, q: MemoryQuery) -> list[MemoryEntry]:
@@ -73,7 +96,10 @@ class VectorMemory:
         matrix = np.stack(self._vectors, axis=0)  # (N, D)
         sims = matrix @ query_vec  # (N,)
 
-        # Apply filters
+        # Precompute query keywords for hybrid lexical-vector matching boost
+        q_words = set(w.lower() for w in q.query_text.split() if len(w) >= 3)
+
+        # Apply filters & hybrid lexical scoring boost
         candidates: list[tuple[int, float]] = []
         kinds_set = set(q.kinds) if q.kinds else None
         for i, entry in enumerate(self._entries):
@@ -84,9 +110,18 @@ class VectorMemory:
             if q.metadata_filter:
                 if not all(entry.metadata.get(k) == v for k, v in q.metadata_filter.items()):
                     continue
-            if sims[i] < self.config.min_similarity:
+
+            score = float(sims[i])
+            if q_words:
+                content_words = set(w.lower() for w in entry.content.split())
+                overlap = len(q_words & content_words)
+                if overlap > 0:
+                    # Hybrid boost: scale score up based on exact word matches
+                    score += 0.3 * (overlap / len(q_words))
+
+            if score < self.config.min_similarity:
                 continue
-            candidates.append((i, float(sims[i])))
+            candidates.append((i, score))
 
         candidates.sort(key=lambda x: x[1], reverse=True)
         top = candidates[: max(0, int(q.top_k))]

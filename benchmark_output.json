@@ -3,34 +3,34 @@
 --- Running Vector Memory Recall & Latency Benchmarks ---
 --- Running SQLite Persistence Benchmarks ---
 --- Running Summarizer Retention Quality Benchmarks ---
---- Running AgentMemory Orchestrator Benchmarks ---
+--- Running AgentMemory Orchestrator & Agentic Routines Benchmarks ---
 
 ================ BENCHMARK RESULTS SUMMARY ================
 {
   "token_counter": {
     "heuristic": {
-      "elapsed_sec": 0.0013,
-      "ops_per_sec": 1157280.61,
+      "elapsed_sec": 0.00129,
+      "ops_per_sec": 1165454.98,
       "total_tokens_counted": 1313000
     },
     "heuristic_custom_ratio": {
-      "elapsed_sec": 0.00131,
-      "ops_per_sec": 1144248.55,
+      "elapsed_sec": 0.00127,
+      "ops_per_sec": 1182523.25,
       "total_tokens_counted": 1501000
     }
   },
   "window_manager": {
     "sliding": {
-      "elapsed_sec": 1.84984,
-      "ops_per_sec": 54.06,
+      "elapsed_sec": 1.842,
+      "ops_per_sec": 54.29,
       "budget_violations": 0,
       "kept_count": 40,
       "used_tokens": 976,
       "budget_tokens": 993
     },
     "truncate_oldest": {
-      "elapsed_sec": 1.8396,
-      "ops_per_sec": 54.36,
+      "elapsed_sec": 1.86853,
+      "ops_per_sec": 53.52,
       "budget_violations": 0,
       "kept_count": 40,
       "used_tokens": 976,
@@ -39,23 +39,23 @@
   },
   "vector_memory": {
     "fact_count": 10,
-    "ingest_time_sec": 0.00132,
-    "ingest_per_fact_sec": 0.000132,
-    "query_ops_per_sec": 9503.61,
+    "ingest_time_sec": 0.00138,
+    "ingest_per_fact_sec": 0.000138,
+    "query_ops_per_sec": 6434.21,
     "recall_top3_rate": 0.3333
   },
   "persistence": {
     "written_messages": 500,
     "write_time_sec": 0.00529,
-    "write_msgs_per_sec": 94548.63,
+    "write_msgs_per_sec": 94514.33,
     "read_iterations": 100,
-    "read_ops_per_sec": 154.19,
+    "read_ops_per_sec": 159.17,
     "read_returned_count": 500
   },
   "summarizer": {
     "summary_output": "I will prepare the quarterly performance report for the meeting.\nuser: Make sure to include revenue growth metrics and user retention statistics.\nassistant: Understood.",
     "covered_messages_count": 4,
-    "execution_time_sec": 0.00025,
+    "execution_time_sec": 0.00037,
     "important_keywords": [
       "meeting",
       "10 AM",
@@ -71,16 +71,19 @@
     "retention_score": 0.6
   },
   "orchestrator": {
-    "total_messages": 100,
+    "total_messages": 102,
     "total_long_term_facts": 2,
-    "ingest_time_sec": 0.00532,
-    "prepare_ops_per_sec": 214.37,
-    "prepared_pack_messages": 14,
+    "ingest_time_sec": 0.00563,
+    "chat_turn_routine_sec": 0.00533,
+    "consolidation_routine_sec": 0.00628,
+    "maintenance_routine_sec": 4e-05,
+    "prepare_ops_per_sec": 189.5,
+    "prepared_pack_messages": 15,
     "prepared_used_tokens": 188,
-    "prepared_retrieved_facts_count": 2
+    "prepared_retrieved_facts_count": 3
   },
   "system_memory": {
-    "maxrss_before_mb": 54.76,
+    "maxrss_before_mb": 54.77,
     "maxrss_after_mb": 57.89,
     "maxrss_delta_mb": 3.12
   }

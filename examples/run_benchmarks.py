@@ -220,7 +220,7 @@ def benchmark_extractive_summarizer() -> Dict[str, Any]:
 
 
 def benchmark_orchestrator() -> Dict[str, Any]:
-    print("--- Running AgentMemory Orchestrator Benchmarks ---")
+    print("--- Running AgentMemory Orchestrator & Agentic Routines Benchmarks ---")
     mem = AgentMemory.from_config({
         "persistence": {"sqlite_path": ":memory:"},
         "vector": {"enabled": True},
@@ -237,6 +237,21 @@ def benchmark_orchestrator() -> Dict[str, Any]:
     mem.add_long_term("System architecture: Database layer uses SQLite in-memory mode.")
     ingest_elapsed = time.perf_counter() - start_ingest
 
+    # Test chat turn routine
+    start_routine = time.perf_counter()
+    mem.chat_turn("Routine query test", assistant_responder=lambda pack: "Routine response")
+    routine_elapsed = time.perf_counter() - start_routine
+
+    # Test consolidation routine
+    start_consolidation = time.perf_counter()
+    mem.consolidate_session()
+    consolidation_elapsed = time.perf_counter() - start_consolidation
+
+    # Test maintenance routine
+    start_maint = time.perf_counter()
+    maint_stats = mem.maintain_memory(decay_factor=0.9, min_importance=0.1)
+    maint_elapsed = time.perf_counter() - start_maint
+
     # Prepare LLM context
     start_prep = time.perf_counter()
     iterations = 50
@@ -248,6 +263,9 @@ def benchmark_orchestrator() -> Dict[str, Any]:
         "total_messages": mem.stats()["message_count"],
         "total_long_term_facts": mem.stats()["long_term_count"],
         "ingest_time_sec": round(ingest_elapsed, 5),
+        "chat_turn_routine_sec": round(routine_elapsed, 5),
+        "consolidation_routine_sec": round(consolidation_elapsed, 5),
+        "maintenance_routine_sec": round(maint_elapsed, 5),
         "prepare_ops_per_sec": round(iterations / prep_elapsed, 2),
         "prepared_pack_messages": len(pack.to_chat_messages()),
         "prepared_used_tokens": pack.used_tokens,
