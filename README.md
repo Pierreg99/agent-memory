@@ -66,7 +66,17 @@ agent_memory/                # Library package
 tests/                       # 48 unit + integration tests
 examples/                    # Runnable end-to-end demo
 docs/architecture.md         # Detailed design notes
+CHANGELOG.md                 # Version release history and changes
+ROADMAP.md                   # Strategic development roadmap and milestones
+PROGRESS.md                  # Project status and implementation metrics
 ```
+
+## Documentation & Roadmap
+
+- **[Architecture Guide](docs/architecture.md)** — Detailed subsystem breakdown, data flow diagrams, and design trade-offs.
+- **[Changelog](CHANGELOG.md)** — Comprehensive version history and release notes.
+- **[Roadmap](ROADMAP.md)** — Future development plans including Async support, external vector databases, and telemetry.
+- **[Progress Report](PROGRESS.md)** — Current status, component test matrix, and completed deliverables.
 
 ## Installation
 
