@@ -66,6 +66,9 @@ agent_memory/                # Library package
 tests/                       # 48 unit + integration tests
 examples/                    # Runnable end-to-end demo
 docs/architecture.md         # Detailed design notes
+CHANGELOG.md                 # Release version history
+PROGRESS.md                  # Implementation progress & test coverage metrics
+ROADMAP.md                   # Future development roadmap
 ```
 
 ## Installation
@@ -105,6 +108,13 @@ mem = AgentMemory.from_config({
 
 See `agent_memory/config/defaults.yaml` for the full list of knobs and
 `docs/architecture.md` for the design rationale.
+
+## Documentation
+
+- **[Architecture Guide](docs/architecture.md)** — Architectural design, flow diagrams, and extension points.
+- **[Changelog](CHANGELOG.md)** — Version release notes and change logs.
+- **[Progress Report](PROGRESS.md)** — Implementation status and test coverage metrics.
+- **[Project Roadmap](ROADMAP.md)** — Strategic milestones and planned features.
 
 ## Demo
 
