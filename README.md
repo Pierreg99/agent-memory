@@ -66,6 +66,9 @@ agent_memory/                # Library package
 tests/                       # 48 unit + integration tests
 examples/                    # Runnable end-to-end demo
 docs/architecture.md         # Detailed design notes
+CHANGELOG.md                 # Release history and version changes
+ROADMAP.md                   # Feature development milestones
+PROGRESS.md                  # System status and coverage metrics
 ```
 
 ## Installation
@@ -81,6 +84,13 @@ git clone https://github.com/Pierreg99/agent-memory.git
 cd agent-memory
 pip install -e .
 ```
+
+## Documentation & Project Specs
+
+- [Architecture Design](docs/architecture.md) — Detailed design, component flow, and extension points.
+- [Changelog](CHANGELOG.md) — Release notes and version history.
+- [Roadmap](ROADMAP.md) — Planned feature milestones and development roadmap.
+- [Progress Report](PROGRESS.md) — Current implementation metrics, test coverage, and status matrix.
 
 ## Tests
 
