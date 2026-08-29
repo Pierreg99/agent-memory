@@ -112,6 +112,12 @@ See `agent_memory/config/defaults.yaml` for the full list of knobs and
 PYTHONPATH=. python examples/run_demo.py
 ```
 
+## Progress & Roadmap
+
+For details on completed milestones, release history, and planned features, see:
+- [CHANGELOG.md](CHANGELOG.md) — Version release history and detailed change logs.
+- [ROADMAP.md](ROADMAP.md) — Current progress, architecture milestones, and future roadmap.
+
 ## License
 
 MIT — see `LICENSE`.
