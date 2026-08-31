@@ -107,25 +107,34 @@ class AgentMemory:
         self,
         content: str,
         session_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
         **meta: Any,
     ) -> Message:
-        return self.add(Role.USER, content, session_id, meta or None)
+        combined = dict(metadata or {})
+        combined.update(meta)
+        return self.add(Role.USER, content, session_id, combined or None)
 
     def add_assistant(
         self,
         content: str,
         session_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
         **meta: Any,
     ) -> Message:
-        return self.add(Role.ASSISTANT, content, session_id, meta or None)
+        combined = dict(metadata or {})
+        combined.update(meta)
+        return self.add(Role.ASSISTANT, content, session_id, combined or None)
 
     def add_system(
         self,
         content: str,
         session_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
         **meta: Any,
     ) -> Message:
-        return self.add(Role.SYSTEM, content, session_id, meta or None)
+        combined = dict(metadata or {})
+        combined.update(meta)
+        return self.add(Role.SYSTEM, content, session_id, combined or None)
 
     def add_long_term(
         self,

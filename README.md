@@ -38,7 +38,7 @@ for cm in pack.to_chat_messages():
 - **Thread-safe**, **dependency-light** (only `pydantic`, `numpy`,
   `pyyaml`, `requests` are required; `tiktoken` and `sentence-transformers`
   are optional).
-- **Fully tested** — 48 unit + integration tests covering every module.
+- **Fully tested** — 50+ unit + integration tests covering every module.
 
 ## Layout
 
@@ -63,9 +63,11 @@ agent_memory/                # Library package
 └── persistence/             # SQLite store
     └── store.py
 
-tests/                       # 48 unit + integration tests
+tests/                       # 50+ unit + integration tests
 examples/                    # Runnable end-to-end demo
 docs/architecture.md         # Detailed design notes
+CHANGELOG.md                 # Version history & release notes
+ROADMAP.md                   # Future development roadmap
 ```
 
 ## Installation
@@ -87,7 +89,7 @@ pip install -e .
 ```bash
 pip install pytest
 python -m pytest tests/ -v
-# 48 passed
+# 51 passed
 ```
 
 ## Configuration
@@ -111,6 +113,11 @@ See `agent_memory/config/defaults.yaml` for the full list of knobs and
 ```bash
 PYTHONPATH=. python examples/run_demo.py
 ```
+
+## Documentation & Roadmap
+
+- See `CHANGELOG.md` for version release notes.
+- See `ROADMAP.md` for upcoming features and long-term milestones.
 
 ## License
 

@@ -127,3 +127,23 @@ def test_vector_memory_clear():
     assert len(vm) == 1
     vm.clear()
     assert len(vm) == 0
+
+
+def test_vector_memory_empty_query_and_invalid_top_k():
+    cfg = VectorConfig(dim=16)
+    vm = VectorMemory(cfg)
+    vm.add(
+        MemoryEntry(
+            kind=MemoryKind.LONG_TERM,
+            session_id="s1",
+            content="test content",
+        )
+    )
+    q_empty = MemoryQuery(session_id="s1", query_text="", top_k=5)
+    assert vm.query(q_empty) == []
+
+    q_space = MemoryQuery(session_id="s1", query_text="   ", top_k=5)
+    assert vm.query(q_space) == []
+
+    q_invalid_k = MemoryQuery(session_id="s1", query_text="test", top_k=0)
+    assert vm.query(q_invalid_k) == []

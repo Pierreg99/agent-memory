@@ -123,3 +123,15 @@ def test_persistence_disabled_works():
     mem.add_user("hi")
     pack = mem.prepare("any")
     assert pack.recent_messages == []  # store is null
+
+
+def test_add_helpers_metadata_merging():
+    mem = _make_mem()
+    msg_u = mem.add_user("hello user", metadata={"source": "web"}, user_id=123)
+    assert msg_u.metadata == {"source": "web", "user_id": 123}
+
+    msg_a = mem.add_assistant("hello assistant", metadata={"model": "gpt-4"}, latency=0.5)
+    assert msg_a.metadata == {"model": "gpt-4", "latency": 0.5}
+
+    msg_s = mem.add_system("hello system", metadata={"env": "prod"}, debug=True)
+    assert msg_s.metadata == {"env": "prod", "debug": True}

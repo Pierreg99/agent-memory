@@ -97,3 +97,19 @@ def test_window_accounts_for_system_prompt():
     # Effective budget is 50 - 25 = 25 tokens; only 3 messages fit
     assert r.budget_tokens == 25
     assert len(r.kept) <= 4
+
+
+def test_window_sliding_keep_last_turns_floor():
+    wm = WindowManager(
+        WindowConfig(
+            strategy=WindowStrategy.SLIDING,
+            max_tokens=10,
+            keep_last_turns=4,
+            reserve_for_response=0,
+        ),
+        counter=HeuristicTokenCounter(TokenConfig(chars_per_token=4)),
+    )
+    msgs = _msgs(10)  # each 8 tokens
+    r = wm.apply(msgs)
+    # Budget is 10 tokens (fits 1 msg), but keep_last_turns floor is 4
+    assert len(r.kept) == 4
