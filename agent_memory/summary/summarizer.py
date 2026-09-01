@@ -24,9 +24,8 @@ from typing import Iterable, Optional, Protocol
 import requests
 
 from ..config.settings import LLMSummaryConfig, SummaryConfig
-from ..core.models import Message, MemoryEntry
+from ..core.models import MemoryEntry, Message
 from ..core.types import MemoryKind
-
 
 # English stopwords for the extractive heuristic. Small list by design.
 _STOPWORDS = {

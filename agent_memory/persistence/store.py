@@ -24,7 +24,6 @@ from typing import Iterable, Iterator, Optional
 from ..core.models import MemoryEntry, Message
 from ..core.types import MemoryKind, Role
 
-
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
     id          TEXT PRIMARY KEY,

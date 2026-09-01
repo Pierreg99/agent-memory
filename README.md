@@ -1,5 +1,9 @@
 # Agent Memory
 
+[![CI](https://github.com/Pierreg99/agent-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/Pierreg99/agent-memory/actions/workflows/ci.yml)
+[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A modular, configurable Python library that gives any LLM agent a real
 memory layer: token-aware context windowing, automatic summarization,
 RAG-style long-term recall, and durable persistence — all driven by
@@ -38,7 +42,7 @@ for cm in pack.to_chat_messages():
 - **Thread-safe**, **dependency-light** (only `pydantic`, `numpy`,
   `pyyaml`, `requests` are required; `tiktoken` and `sentence-transformers`
   are optional).
-- **Fully tested** — 48 unit + integration tests covering every module.
+- **Fully tested** — unit + integration tests covering every module.
 
 ## Layout
 
@@ -63,7 +67,7 @@ agent_memory/                # Library package
 └── persistence/             # SQLite store
     └── store.py
 
-tests/                       # 48 unit + integration tests
+tests/                       # Unit + integration tests
 examples/                    # Runnable end-to-end demo
 docs/architecture.md         # Detailed design notes
 ```
@@ -82,12 +86,18 @@ cd agent-memory
 pip install -e .
 ```
 
-## Tests
+## Tests & Quality Checks
+
+Run unit tests and coverage:
 
 ```bash
-pip install pytest
-python -m pytest tests/ -v
-# 48 passed
+python -m pytest
+```
+
+Run linter:
+
+```bash
+ruff check .
 ```
 
 ## Configuration
@@ -111,6 +121,10 @@ See `agent_memory/config/defaults.yaml` for the full list of knobs and
 ```bash
 PYTHONPATH=. python examples/run_demo.py
 ```
+
+## Contributing
+
+Feel free to open issues or submit pull requests. Please refer to the `.github/ISSUE_TEMPLATE` when submitting bug reports or feature requests.
 
 ## License
 

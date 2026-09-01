@@ -1,0 +1,23 @@
+name: Feature Request
+description: Suggest an idea or enhancement for agent-memory.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an enhancement for agent-memory!
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: Is your feature request related to a problem? Please describe.
+      placeholder: A clear and concise description of what you want to achieve...
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like or any alternatives considered.
+    validations:
+      required: false

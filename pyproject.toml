@@ -36,6 +36,8 @@ tiktoken = ["tiktoken>=0.5"]
 sentence-transformers = ["sentence-transformers>=2.2"]
 dev = [
     "pytest>=8.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -43,4 +45,12 @@ packages = ["agent_memory"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra --cov=agent_memory"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
