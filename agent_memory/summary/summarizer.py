@@ -19,14 +19,14 @@ from __future__ import annotations
 import os
 import re
 from collections import Counter
-from typing import Iterable, Optional, Protocol
+from collections.abc import Iterable
+from typing import Protocol
 
 import requests
 
 from ..config.settings import LLMSummaryConfig, SummaryConfig
-from ..core.models import Message, MemoryEntry
+from ..core.models import MemoryEntry, Message
 from ..core.types import MemoryKind
-
 
 # English stopwords for the extractive heuristic. Small list by design.
 _STOPWORDS = {
@@ -77,7 +77,7 @@ class ExtractiveSummarizer:
     N is chosen to fit within `max_tokens` (using the heuristic counter).
     """
 
-    def __init__(self, config: Optional[SummaryConfig] = None) -> None:
+    def __init__(self, config: SummaryConfig | None = None) -> None:
         self.config = config or SummaryConfig()
         # Local import to avoid a circular import
         from ..window.token_counter import HeuristicTokenCounter
@@ -155,7 +155,7 @@ class LLMSummarizer:
         "numbers, and unresolved questions. Output plain text only."
     )
 
-    def __init__(self, config: Optional[SummaryConfig] = None) -> None:
+    def __init__(self, config: SummaryConfig | None = None) -> None:
         self.config = config or SummaryConfig()
         self.llm_cfg: LLMSummaryConfig = self.config.llm
 
@@ -213,7 +213,7 @@ class ResilientSummarizer:
     network or API access.
     """
 
-    def __init__(self, config: Optional[SummaryConfig] = None) -> None:
+    def __init__(self, config: SummaryConfig | None = None) -> None:
         self.config = config or SummaryConfig()
         self.llm = LLMSummarizer(self.config)
         self.extractive = ExtractiveSummarizer(self.config)

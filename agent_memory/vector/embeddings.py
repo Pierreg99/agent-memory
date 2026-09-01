@@ -60,7 +60,7 @@ class HashEmbedder:
         self.dim = int(self.config.dim)
 
     def _hash_pair(self, token: str, n: int) -> tuple[int, float]:
-        h = hashlib.blake2b(f"{n}:{token}".encode("utf-8"), digest_size=8).digest()
+        h = hashlib.blake2b(f"{n}:{token}".encode(), digest_size=8).digest()
         idx = int.from_bytes(h[:4], "big") % self.dim
         sign = 1.0 if (h[4] & 1) else -1.0
         return idx, sign

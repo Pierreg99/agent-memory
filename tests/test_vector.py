@@ -1,7 +1,7 @@
 """Tests for vector memory and embeddings."""
 from agent_memory.config.settings import VectorConfig
 from agent_memory.core.models import MemoryEntry, MemoryQuery
-from agent_memory.core.types import MemoryKind, Role
+from agent_memory.core.types import MemoryKind
 from agent_memory.vector.embeddings import HashEmbedder
 from agent_memory.vector.memory import VectorMemory
 
@@ -127,3 +127,34 @@ def test_vector_memory_clear():
     assert len(vm) == 1
     vm.clear()
     assert len(vm) == 0
+
+
+def test_custom_embedder_protocol_compatibility():
+    class CustomEmbedder:
+        dim = 16
+
+        def embed_text(self, text: str) -> list[float]:
+            return [1.0] * 16
+
+        def embed_entry(self, entry: MemoryEntry) -> list[float]:
+            return self.embed_text(entry.content)
+
+    cfg = VectorConfig(dim=16)
+    custom_embedder = CustomEmbedder()
+    vm = VectorMemory(config=cfg, embedder=custom_embedder)
+
+    e = MemoryEntry(kind=MemoryKind.LONG_TERM, session_id="s1", content="custom embedder test")
+    vm.add(e)
+    results = vm.query(MemoryQuery(session_id="s1", query_text="test"))
+    assert len(results) == 1
+    assert results[0].content == "custom embedder test"
+
+
+def test_py_typed_file_exists():
+    import pathlib
+
+    import agent_memory
+
+    pkg_dir = pathlib.Path(agent_memory.__file__).parent
+    py_typed_file = pkg_dir / "py.typed"
+    assert py_typed_file.exists()

@@ -6,8 +6,9 @@ counter for accurate token accounting. The counter caches the per-message
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from functools import lru_cache
-from typing import Iterable, Protocol
+from typing import Protocol
 
 from ..config.settings import TokenConfig
 from ..core.models import Message

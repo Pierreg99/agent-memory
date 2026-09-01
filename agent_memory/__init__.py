@@ -27,6 +27,12 @@ from .summary.summarizer import (
     ResilientSummarizer,
     Summarizer,
 )
+from .vector.embeddings import (
+    Embedder,
+    HashEmbedder,
+    SentenceTransformersEmbedder,
+    build_embedder,
+)
 from .vector.memory import VectorMemory
 from .window.token_counter import (
     HeuristicTokenCounter,
@@ -57,6 +63,10 @@ __all__ = [
     "Summarizer",
     "ExtractiveSummarizer",
     "ResilientSummarizer",
+    "Embedder",
+    "HashEmbedder",
+    "SentenceTransformersEmbedder",
+    "build_embedder",
     "VectorMemory",
     "MemoryStore",
 ]
