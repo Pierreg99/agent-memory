@@ -5,7 +5,7 @@ memory layer: token-aware context windowing, automatic summarization,
 RAG-style long-term recall, and durable persistence — all driven by
 YAML config.
 
-## Quick start
+## Quick Start
 
 ```python
 from agent_memory import AgentMemory
@@ -66,7 +66,17 @@ agent_memory/                # Library package
 tests/                       # 48 unit + integration tests
 examples/                    # Runnable end-to-end demo
 docs/architecture.md         # Detailed design notes
+CHANGELOG.md                 # Release notes and history
+PROGRESS.md                  # Implementation status & component matrix
+ROADMAP.md                   # Strategic development roadmap
 ```
+
+## Documentation
+
+- [Architecture Guide](docs/architecture.md) — Detailed design rationale and configuration parameters.
+- [Changelog](CHANGELOG.md) — Release history and changes.
+- [Project Progress](PROGRESS.md) — Current implementation status and component matrix.
+- [Roadmap](ROADMAP.md) — Strategic roadmap and upcoming features.
 
 ## Installation
 
