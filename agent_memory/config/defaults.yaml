@@ -40,6 +40,10 @@ vector:
   min_similarity: 0.0               # Drop matches below this cosine similarity
   # Optional sentence-transformers model (used when backend == sentence_transformers)
   model_name: all-MiniLM-L6-v2
+  decay_enabled: false
+  half_life_days: 30.0
+  min_importance_threshold: 0.01
+  max_entries: null
 
 # --- Persistence ------------------------------------------------------------
 persistence:
@@ -52,3 +56,10 @@ persistence:
 session:
   default_id: default
   clear_on_start: false             # If true, drop existing session data on init
+
+# --- Agent Roles & Permissions ----------------------------------------------
+agent_role:
+  role_name: primary
+  can_write_long_term: true
+  can_write_persistent: true
+  isolate_working_memory: true

@@ -1,12 +1,7 @@
 """End-to-end tests for the AgentMemory orchestrator."""
 from agent_memory import AgentMemory
-from agent_memory.config.settings import MemorySettings
 from agent_memory.core.types import (
-    EmbeddingBackend,
-    MemoryKind,
     Role,
-    SummarizerBackend,
-    WindowStrategy,
 )
 
 

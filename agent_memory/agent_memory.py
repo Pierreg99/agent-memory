@@ -39,6 +39,7 @@ class AgentMemory:
         summarizer: Optional[Summarizer] = None,
         store: Optional[MemoryStore] = None,
         vector: Optional[VectorMemory] = None,
+        working_entries: Optional[list[MemoryEntry]] = None,
     ) -> None:
         self.settings = settings
         self.counter = counter or build_counter(settings.tokens)
@@ -55,6 +56,7 @@ class AgentMemory:
         self.vector = vector or (
             VectorMemory(settings.vector) if settings.vector.enabled else None
         )
+        self._working_entries = working_entries if working_entries is not None else []
 
     # ---- factories -------------------------------------------------------
 
@@ -71,6 +73,39 @@ class AgentMemory:
     def from_yaml(cls, path: str) -> "AgentMemory":
         settings = MemorySettings.from_yaml(path)
         return cls(settings=settings)
+
+    # ---- eviction -------------------------------------------------------
+
+    def evict_stale(
+        self,
+        session_id: Optional[str] = None,
+        min_importance: Optional[float] = None,
+        current_time: Optional[float] = None,
+    ) -> dict[str, int]:
+        """Evict stale or low-importance facts from vector memory and persistent store."""
+        min_imp = (
+            min_importance
+            if min_importance is not None
+            else self.settings.vector.min_importance_threshold
+        )
+        vec_evicted = 0
+        if self.vector is not None:
+            vec_evicted = self.vector.evict(
+                session_id=session_id,
+                min_importance=min_imp,
+                max_entries=self.settings.vector.max_entries,
+                current_time=current_time,
+            )
+        store_evicted = 0
+        if hasattr(self.store, "evict_stale"):
+            store_evicted = self.store.evict_stale(
+                session_id=session_id,
+                min_importance=min_imp,
+                half_life_days=self.settings.vector.half_life_days,
+                decay_enabled=self.settings.vector.decay_enabled,
+                current_time=current_time,
+            )
+        return {"vector_evicted": vec_evicted, "store_evicted": store_evicted}
 
     # ---- session helpers ------------------------------------------------
 
@@ -127,27 +162,137 @@ class AgentMemory:
     ) -> Message:
         return self.add(Role.SYSTEM, content, session_id, meta or None)
 
+    def create_sub_agent_memory(
+        self,
+        role_name: str,
+        can_write_long_term: bool = False,
+        can_write_persistent: bool = True,
+    ) -> "AgentMemory":
+        """Spawn a child AgentMemory instance with restricted permissions for sub-agent execution."""
+        sub_settings = self.settings.model_copy(deep=True)
+        sub_settings.agent_role.role_name = role_name
+        sub_settings.agent_role.can_write_long_term = can_write_long_term
+        sub_settings.agent_role.can_write_persistent = can_write_persistent
+        return AgentMemory(
+            settings=sub_settings,
+            counter=self.counter,
+            window=self.window,
+            summarizer=self.summarizer,
+            store=self.store,
+            vector=self.vector,
+            working_entries=self._working_entries,
+        )
+
     def add_long_term(
         self,
         content: str,
         session_id: Optional[str] = None,
         importance: float = 1.0,
+        entity: Optional[str] = None,
+        attribute: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
     ) -> MemoryEntry:
         """Store a long-term fact and add it to vector memory if enabled."""
+        if not self.settings.agent_role.can_write_long_term:
+            raise PermissionError(
+                f"Agent role '{self.settings.agent_role.role_name}' does not have permission to write long-term memory."
+            )
+
         sid = session_id or self.default_session
+        meta = dict(metadata or {})
+        ent = entity or meta.get("entity")
+        attr = attribute or meta.get("attribute")
+
         entry = MemoryEntry(
             kind=MemoryKind.LONG_TERM,
             session_id=sid,
             role=Role.SYSTEM,
             content=content,
             importance=importance,
-            metadata=metadata or {},
+            entity=ent,
+            attribute=attr,
+            metadata=meta,
         )
-        self.store.add_long_term(entry)
+        if self.settings.agent_role.can_write_persistent:
+            self.store.add_long_term(entry)
         if self.vector is not None:
             self.vector.add(entry)
         return entry
+
+    def add_working(
+        self,
+        content: str,
+        session_id: Optional[str] = None,
+        importance: float = 0.5,
+        entity: Optional[str] = None,
+        attribute: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> MemoryEntry:
+        """Store intermediate sub-agent state in working memory without polluting long-term RAG."""
+        sid = session_id or self.default_session
+        meta = dict(metadata or {})
+        meta["agent_role"] = self.settings.agent_role.role_name
+        ent = entity or meta.get("entity")
+        attr = attribute or meta.get("attribute")
+
+        entry = MemoryEntry(
+            kind=MemoryKind.WORKING,
+            session_id=sid,
+            role=Role.SYSTEM,
+            content=content,
+            importance=importance,
+            entity=ent,
+            attribute=attr,
+            metadata=meta,
+        )
+        self._working_entries.append(entry)
+        if self.settings.agent_role.can_write_persistent:
+            self.store.add_long_term(entry)
+        return entry
+
+    def get_working_entries(self, session_id: Optional[str] = None) -> list[MemoryEntry]:
+        """Retrieve working memory entries for the session."""
+        sid = session_id or self.default_session
+        result_map: dict[str, MemoryEntry] = {}
+        if hasattr(self.store, "get_working"):
+            for e in self.store.get_working(sid):
+                result_map[e.id] = e
+        for e in self._working_entries:
+            if e.session_id == sid and e.id not in result_map:
+                result_map[e.id] = e
+        return list(result_map.values())
+
+    def promote_working_to_long_term(
+        self,
+        entry_ids: Union[str, list[str]],
+        session_id: Optional[str] = None,
+        importance: Optional[float] = None,
+    ) -> list[MemoryEntry]:
+        """Promote specified working memory entry/entries into permanent long-term memory."""
+        if not self.settings.agent_role.can_write_long_term:
+            raise PermissionError(
+                f"Agent role '{self.settings.agent_role.role_name}' does not have permission to promote working memory to long-term memory."
+            )
+
+        sid = session_id or self.default_session
+        ids = [entry_ids] if isinstance(entry_ids, str) else list(entry_ids)
+        working_all = self.get_working_entries(sid)
+        promoted: list[MemoryEntry] = []
+
+        for w_entry in working_all:
+            if w_entry.id in ids:
+                imp = importance if importance is not None else w_entry.importance
+                lt_entry = self.add_long_term(
+                    content=w_entry.content,
+                    session_id=sid,
+                    importance=imp,
+                    entity=w_entry.entity,
+                    attribute=w_entry.attribute,
+                    metadata=dict(w_entry.metadata),
+                )
+                promoted.append(lt_entry)
+
+        return promoted
 
     def add_many_long_term(
         self,

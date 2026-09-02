@@ -52,11 +52,21 @@ class MemoryEntry(BaseModel):
     importance: float = 1.0
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    # Temporal & Knowledge Graph fields
+    entity: Optional[str] = None
+    attribute: Optional[str] = None
+    valid_from: Optional[float] = None
+    valid_until: Optional[float] = None
+    is_superseded: bool = False
+    superseded_by: Optional[str] = None
+
     def model_post_init(self, _ctx: Any) -> None:
         if isinstance(self.kind, str):
             self.kind = MemoryKind(self.kind)
         if isinstance(self.role, str) and self.role is not None:
             self.role = Role(self.role)
+        if self.valid_from is None:
+            self.valid_from = self.created_at
 
 
 class MemoryQuery(BaseModel):
@@ -70,6 +80,7 @@ class MemoryQuery(BaseModel):
     )
     min_importance: float = 0.0
     metadata_filter: dict[str, Any] = Field(default_factory=dict)
+    include_superseded: bool = False
 
 
 class MemoryPack(BaseModel):

@@ -6,6 +6,7 @@ filtering and importance-based filtering.
 """
 from __future__ import annotations
 
+import time
 from typing import Iterable, Optional
 
 import numpy as np
@@ -39,6 +40,20 @@ class VectorMemory:
 
     def add(self, entry: MemoryEntry) -> None:
         """Embed and store an entry."""
+        if entry.kind == MemoryKind.LONG_TERM and entry.entity and entry.attribute:
+            for e in self._entries:
+                if (
+                    e.kind == MemoryKind.LONG_TERM
+                    and e.session_id == entry.session_id
+                    and e.entity == entry.entity
+                    and e.attribute == entry.attribute
+                    and not e.is_superseded
+                    and e.id != entry.id
+                ):
+                    e.is_superseded = True
+                    e.superseded_by = entry.id
+                    e.valid_until = entry.created_at
+
         if entry.embedding is None:
             entry.embedding = self.embedder.embed_entry(entry)
         vec = np.asarray(entry.embedding, dtype=np.float32)
@@ -58,9 +73,66 @@ class VectorMemory:
         self._entries.clear()
         self._vectors.clear()
 
+    # ---- decay & eviction ------------------------------------------------
+
+    def compute_effective_importance(
+        self,
+        entry: MemoryEntry,
+        current_time: Optional[float] = None,
+    ) -> float:
+        """Compute the entry's importance adjusted for exponential time decay if enabled."""
+        if not self.config.decay_enabled or self.config.half_life_days <= 0:
+            return entry.importance
+        now = current_time if current_time is not None else time.time()
+        age_seconds = max(0.0, now - entry.created_at)
+        age_days = age_seconds / 86400.0
+        decay_factor = 0.5 ** (age_days / self.config.half_life_days)
+        return entry.importance * decay_factor
+
+    def evict(
+        self,
+        session_id: Optional[str] = None,
+        min_importance: Optional[float] = None,
+        max_entries: Optional[int] = None,
+        current_time: Optional[float] = None,
+    ) -> int:
+        """Evict stale entries below min_importance threshold or to satisfy max_entries capacity."""
+        min_imp = min_importance if min_importance is not None else self.config.min_importance_threshold
+        max_e = max_entries if max_entries is not None else self.config.max_entries
+
+        now = current_time if current_time is not None else time.time()
+
+        keep_indices: list[int] = []
+        for i, entry in enumerate(self._entries):
+            if session_id is not None and entry.session_id != session_id:
+                keep_indices.append(i)
+                continue
+            eff_imp = self.compute_effective_importance(entry, current_time=now)
+            if eff_imp >= min_imp:
+                keep_indices.append(i)
+
+        if max_e is not None and len(keep_indices) > max_e:
+            keep_indices.sort(
+                key=lambda idx: self.compute_effective_importance(self._entries[idx], current_time=now),
+                reverse=True,
+            )
+            keep_indices = keep_indices[:max_e]
+
+        keep_set = set(keep_indices)
+        evicted_count = len(self._entries) - len(keep_set)
+        if evicted_count > 0:
+            self._entries = [self._entries[i] for i in range(len(self._entries)) if i in keep_set]
+            self._vectors = [self._vectors[i] for i in range(len(self._vectors)) if i in keep_set]
+
+        return evicted_count
+
     # ---- query -----------------------------------------------------------
 
-    def query(self, q: MemoryQuery) -> list[MemoryEntry]:
+    def query(
+        self,
+        q: MemoryQuery,
+        current_time: Optional[float] = None,
+    ) -> list[MemoryEntry]:
         """Return up to q.top_k entries most similar to q.query_text."""
         if not self._entries:
             return []
@@ -73,13 +145,18 @@ class VectorMemory:
         matrix = np.stack(self._vectors, axis=0)  # (N, D)
         sims = matrix @ query_vec  # (N,)
 
+        now = current_time if current_time is not None else time.time()
+
         # Apply filters
         candidates: list[tuple[int, float]] = []
         kinds_set = set(q.kinds) if q.kinds else None
         for i, entry in enumerate(self._entries):
             if kinds_set and entry.kind not in kinds_set:
                 continue
-            if entry.importance < q.min_importance:
+            if not q.include_superseded and entry.is_superseded:
+                continue
+            eff_imp = self.compute_effective_importance(entry, current_time=now)
+            if eff_imp < q.min_importance or eff_imp < self.config.min_importance_threshold:
                 continue
             if q.metadata_filter:
                 if not all(entry.metadata.get(k) == v for k, v in q.metadata_filter.items()):

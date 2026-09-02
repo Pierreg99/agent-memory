@@ -19,7 +19,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterable, Iterator, Optional
+from typing import Any, Iterable, Iterator, Optional, Union
 
 from ..core.models import MemoryEntry, Message
 from ..core.types import MemoryKind, Role
@@ -48,16 +48,24 @@ CREATE INDEX IF NOT EXISTS idx_summaries_session
     ON summaries(session_id, created_at);
 
 CREATE TABLE IF NOT EXISTS long_term (
-    id          TEXT PRIMARY KEY,
-    session_id  TEXT NOT NULL,
-    kind        TEXT NOT NULL,
-    content     TEXT NOT NULL,
-    importance  REAL NOT NULL DEFAULT 1.0,
-    metadata    TEXT,
-    created_at  REAL NOT NULL
+    id            TEXT PRIMARY KEY,
+    session_id    TEXT NOT NULL,
+    kind          TEXT NOT NULL,
+    content       TEXT NOT NULL,
+    importance    REAL NOT NULL DEFAULT 1.0,
+    metadata      TEXT,
+    created_at    REAL NOT NULL,
+    entity        TEXT,
+    attribute     TEXT,
+    valid_from    REAL,
+    valid_until   REAL,
+    is_superseded INTEGER NOT NULL DEFAULT 0,
+    superseded_by TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_long_term_session
     ON long_term(session_id, kind);
+CREATE INDEX IF NOT EXISTS idx_long_term_entity_attr
+    ON long_term(session_id, entity, attribute);
 """
 
 
@@ -209,10 +217,26 @@ class MemoryStore:
 
     def add_long_term(self, entry: MemoryEntry) -> None:
         with self._conn() as conn:
+            if entry.kind == MemoryKind.LONG_TERM and entry.entity and entry.attribute:
+                conn.execute(
+                    "UPDATE long_term "
+                    "SET is_superseded = 1, superseded_by = ?, valid_until = ? "
+                    "WHERE session_id = ? AND kind = ? AND entity = ? AND attribute = ? AND is_superseded = 0 AND id != ?",
+                    (
+                        entry.id,
+                        entry.created_at,
+                        entry.session_id,
+                        MemoryKind.LONG_TERM.value,
+                        entry.entity,
+                        entry.attribute,
+                        entry.id,
+                    ),
+                )
             conn.execute(
                 "INSERT OR REPLACE INTO long_term "
-                "(id, session_id, kind, content, importance, metadata, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "(id, session_id, kind, content, importance, metadata, created_at, "
+                "entity, attribute, valid_from, valid_until, is_superseded, superseded_by) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     entry.id,
                     entry.session_id,
@@ -221,17 +245,79 @@ class MemoryStore:
                     entry.importance,
                     json.dumps(entry.metadata or {}),
                     entry.created_at,
+                    entry.entity,
+                    entry.attribute,
+                    entry.valid_from,
+                    entry.valid_until,
+                    1 if entry.is_superseded else 0,
+                    entry.superseded_by,
                 ),
             )
 
-    def get_long_term(self, session_id: str, limit: int = 100) -> list[MemoryEntry]:
+    def get_long_term(
+        self,
+        session_id: str,
+        limit: int = 100,
+        include_superseded: bool = False,
+        kind: Optional[Union[MemoryKind, str]] = MemoryKind.LONG_TERM,
+    ) -> list[MemoryEntry]:
         with self._conn() as conn:
-            cur = conn.execute(
-                "SELECT id, kind, content, importance, metadata, created_at "
-                "FROM long_term WHERE session_id = ? ORDER BY created_at DESC LIMIT ?",
-                (session_id, limit),
+            query = (
+                "SELECT id, kind, content, importance, metadata, created_at, "
+                "entity, attribute, valid_from, valid_until, is_superseded, superseded_by "
+                "FROM long_term WHERE session_id = ? "
             )
+            params: list[Any] = [session_id]
+            if kind is not None:
+                query += "AND kind = ? "
+                params.append(kind.value if isinstance(kind, MemoryKind) else str(kind))
+            if not include_superseded:
+                query += "AND is_superseded = 0 "
+            query += "ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+
+            cur = conn.execute(query, params)
             return [_row_to_long_term(session_id, r) for r in cur.fetchall()]
+
+    def get_working(self, session_id: str, limit: int = 100) -> list[MemoryEntry]:
+        return self.get_long_term(session_id, limit=limit, include_superseded=True, kind=MemoryKind.WORKING)
+
+    def evict_stale(
+        self,
+        session_id: Optional[str] = None,
+        min_importance: float = 0.01,
+        half_life_days: float = 30.0,
+        decay_enabled: bool = True,
+        current_time: Optional[float] = None,
+    ) -> int:
+        """Evict long_term entries whose effective importance falls below min_importance."""
+        import time
+        now = current_time if current_time is not None else time.time()
+        with self._conn() as conn:
+            query = "SELECT id, created_at, importance FROM long_term"
+            params = []
+            if session_id:
+                query += " WHERE session_id = ?"
+                params.append(session_id)
+            cur = conn.execute(query, params)
+            rows = cur.fetchall()
+            evict_ids = []
+            for r in rows:
+                imp = r["importance"]
+                created = r["created_at"]
+                if decay_enabled and half_life_days > 0:
+                    age_days = max(0.0, now - created) / 86400.0
+                    eff_imp = imp * (0.5 ** (age_days / half_life_days))
+                else:
+                    eff_imp = imp
+                if eff_imp < min_importance:
+                    evict_ids.append(r["id"])
+            if evict_ids:
+                conn.executemany(
+                    "DELETE FROM long_term WHERE id = ?",
+                    [(i,) for i in evict_ids],
+                )
+            return len(evict_ids)
 
     def clear_session(self, session_id: str) -> None:
         with self._conn() as conn:
@@ -261,6 +347,7 @@ def _row_to_message(row: sqlite3.Row) -> Message:
 
 def _row_to_long_term(session_id: str, row: sqlite3.Row) -> MemoryEntry:
     meta = json.loads(row["metadata"] or "{}")
+    keys = row.keys()
     return MemoryEntry(
         id=row["id"],
         kind=MemoryKind(row["kind"]),
@@ -269,4 +356,10 @@ def _row_to_long_term(session_id: str, row: sqlite3.Row) -> MemoryEntry:
         importance=row["importance"],
         metadata=meta,
         created_at=row["created_at"],
+        entity=row["entity"] if "entity" in keys else None,
+        attribute=row["attribute"] if "attribute" in keys else None,
+        valid_from=row["valid_from"] if "valid_from" in keys else None,
+        valid_until=row["valid_until"] if "valid_until" in keys else None,
+        is_superseded=bool(row["is_superseded"]) if "is_superseded" in keys and row["is_superseded"] is not None else False,
+        superseded_by=row["superseded_by"] if "superseded_by" in keys else None,
     )

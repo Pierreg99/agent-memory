@@ -64,6 +64,10 @@ class VectorConfig(BaseModel):
     top_k: int = 4
     min_similarity: float = 0.0
     model_name: str = "all-MiniLM-L6-v2"
+    decay_enabled: bool = False
+    half_life_days: float = 30.0
+    min_importance_threshold: float = 0.01
+    max_entries: Optional[int] = None
 
     @field_validator("backend", mode="before")
     @classmethod
@@ -85,6 +89,13 @@ class SessionConfig(BaseModel):
     clear_on_start: bool = False
 
 
+class AgentRoleConfig(BaseModel):
+    role_name: str = "primary"
+    can_write_long_term: bool = True
+    can_write_persistent: bool = True
+    isolate_working_memory: bool = True
+
+
 class MemorySettings(BaseModel):
     """Top-level settings object."""
 
@@ -94,6 +105,7 @@ class MemorySettings(BaseModel):
     vector: VectorConfig = Field(default_factory=VectorConfig)
     persistence: PersistenceConfig = Field(default_factory=PersistenceConfig)
     session: SessionConfig = Field(default_factory=SessionConfig)
+    agent_role: AgentRoleConfig = Field(default_factory=AgentRoleConfig)
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "MemorySettings":
