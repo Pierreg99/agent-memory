@@ -40,6 +40,13 @@ for cm in pack.to_chat_messages():
   are optional).
 - **Fully tested** — 48 unit + integration tests covering every module.
 
+## Documentation & Project Tracking
+
+- [Architecture Design](docs/architecture.md) — Detailed design choices, subsystem interfaces, and configuration knobs.
+- [Changelog](CHANGELOG.md) — Release notes and history following Keep a Changelog.
+- [Progress Tracker](PROGRESS.md) — Implementation status and test matrix across components.
+- [Project Roadmap](ROADMAP.md) — Planned features and future milestones.
+
 ## Layout
 
 ```
@@ -66,6 +73,9 @@ agent_memory/                # Library package
 tests/                       # 48 unit + integration tests
 examples/                    # Runnable end-to-end demo
 docs/architecture.md         # Detailed design notes
+CHANGELOG.md                 # Release changelog
+PROGRESS.md                  # Implementation progress tracker
+ROADMAP.md                   # Project development roadmap
 ```
 
 ## Installation

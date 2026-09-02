@@ -18,7 +18,7 @@ from typing import Optional
 
 from ..config.settings import WindowConfig
 from ..core.models import Message
-from ..core.types import Role, WindowStrategy
+from ..core.types import WindowStrategy
 from .token_counter import TokenCounter, build_counter
 
 
