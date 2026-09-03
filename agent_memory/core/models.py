@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -26,7 +26,7 @@ class Message(BaseModel):
     content: str
     timestamp: float = Field(default_factory=_now)
     metadata: dict[str, Any] = Field(default_factory=dict)
-    token_count: Optional[int] = None  # Cached token count, computed lazily
+    token_count: int | None = None  # Cached token count, computed lazily
 
     def model_post_init(self, _ctx: Any) -> None:
         # Normalize role if it came in as a string
@@ -44,9 +44,9 @@ class MemoryEntry(BaseModel):
     id: str = Field(default_factory=_new_id)
     kind: MemoryKind
     session_id: str
-    role: Optional[Role] = None
+    role: Role | None = None
     content: str
-    embedding: Optional[list[float]] = None
+    embedding: list[float] | None = None
     source_message_ids: list[str] = Field(default_factory=list)
     created_at: float = Field(default_factory=_now)
     importance: float = 1.0
@@ -81,9 +81,9 @@ class MemoryPack(BaseModel):
     """
 
     session_id: str
-    system_prompt: Optional[str] = None
+    system_prompt: str | None = None
     recent_messages: list[Message] = Field(default_factory=list)
-    summary: Optional[str] = None
+    summary: str | None = None
     summary_covers: list[str] = Field(default_factory=list)
     retrieved_facts: list[MemoryEntry] = Field(default_factory=list)
     used_tokens: int = 0

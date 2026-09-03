@@ -5,7 +5,7 @@ memory layer: token-aware context windowing, automatic summarization,
 RAG-style long-term recall, and durable persistence — all driven by
 YAML config.
 
-## Quick start
+## 🚀 Quick start
 
 ```python
 from agent_memory import AgentMemory
@@ -26,21 +26,33 @@ for cm in pack.to_chat_messages():
     print(cm["role"], "::", cm["content"][:80])
 ```
 
-## Features
+## ✨ Features
 
-- **Token-aware context window** with sliding, truncate-oldest, and
-  summarize-old strategies.
-- **Pluggable summarizer** — extractive by default, OpenAI-compatible
-  LLM adapter available, falls back gracefully on errors.
-- **RAG-style long-term memory** with pluggable embeddings (deterministic
-  hash by default, optional `sentence-transformers`).
-- **SQLite persistence** — per-thread connections, file or in-memory.
-- **Thread-safe**, **dependency-light** (only `pydantic`, `numpy`,
-  `pyyaml`, `requests` are required; `tiktoken` and `sentence-transformers`
-  are optional).
+- **Token-aware context window** with `sliding`, `truncate_oldest`, and `summarize_old` strategies.
+- **Pluggable summarizer** — extractive keyword-scoring by default, OpenAI-compatible LLM adapter available, falls back gracefully on errors.
+- **RAG-style long-term memory** with pluggable embeddings (deterministic hash by default, optional `sentence-transformers`).
+- **SQLite persistence** — thread-safe per-thread connections, file or in-memory.
+- **Thread-safe & dependency-light** (only `pydantic`, `numpy`, `pyyaml`, `requests` required; `tiktoken` and `sentence-transformers` optional).
 - **Fully tested** — 48 unit + integration tests covering every module.
 
-## Layout
+## 📊 Component Progress & Status
+
+| Subsystem | Component | Default Implementation | Status |
+|---|---|---|---|
+| **Orchestrator** | `AgentMemory` | Top-level pipeline orchestrator | ✅ Production Ready |
+| **Context Window** | `WindowManager` | `sliding`, `truncate_oldest`, `summarize_old` | ✅ Production Ready |
+| **Token Counter** | `TokenCounter` | `HeuristicTokenCounter` (optional `TiktokenTokenCounter`) | ✅ Production Ready |
+| **Summarizer** | `Summarizer` | `ExtractiveSummarizer` & `ResilientSummarizer` (LLM + fallback) | ✅ Production Ready |
+| **Vector RAG** | `VectorMemory` | Dense cosine similarity + `HashEmbedder` | ✅ Production Ready |
+| **Persistence** | `MemoryStore` | Thread-safe SQLite store (`:memory:` or disk) | ✅ Production Ready |
+
+## 🗺️ Roadmap & Changelog
+
+- 📖 **Architecture Overview**: See [`docs/architecture.md`](docs/architecture.md) for architectural design notes.
+- 🎯 **Project Roadmap**: See [`ROADMAP.md`](ROADMAP.md) for planned features (Async support, vector DB integrations, streaming counters).
+- 📜 **Changelog**: See [`CHANGELOG.md`](CHANGELOG.md) for version release notes.
+
+## 📁 Repository Layout
 
 ```
 agent_memory/                # Library package
@@ -66,9 +78,11 @@ agent_memory/                # Library package
 tests/                       # 48 unit + integration tests
 examples/                    # Runnable end-to-end demo
 docs/architecture.md         # Detailed design notes
+ROADMAP.md                   # Future milestones & development plans
+CHANGELOG.md                 # Version history & release notes
 ```
 
-## Installation
+## 📦 Installation
 
 ```bash
 pip install agent-memory
@@ -82,7 +96,7 @@ cd agent-memory
 pip install -e .
 ```
 
-## Tests
+## 🧪 Tests
 
 ```bash
 pip install pytest
@@ -90,7 +104,7 @@ python -m pytest tests/ -v
 # 48 passed
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 All behavior is YAML-driven. Override individual fields by passing a
 dict to `AgentMemory.from_config(...)`:
@@ -106,12 +120,12 @@ mem = AgentMemory.from_config({
 See `agent_memory/config/defaults.yaml` for the full list of knobs and
 `docs/architecture.md` for the design rationale.
 
-## Demo
+## 💻 Demo
 
 ```bash
 PYTHONPATH=. python examples/run_demo.py
 ```
 
-## License
+## 📄 License
 
 MIT — see `LICENSE`.

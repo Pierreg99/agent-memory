@@ -11,6 +11,6 @@ __all__ = [
     "Embedder",
     "HashEmbedder",
     "SentenceTransformersEmbedder",
-    "build_embedder",
     "VectorMemory",
+    "build_embedder",
 ]
