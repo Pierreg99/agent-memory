@@ -1,7 +1,7 @@
 """Tests for vector memory and embeddings."""
 from agent_memory.config.settings import VectorConfig
 from agent_memory.core.models import MemoryEntry, MemoryQuery
-from agent_memory.core.types import MemoryKind, Role
+from agent_memory.core.types import MemoryKind
 from agent_memory.vector.embeddings import HashEmbedder
 from agent_memory.vector.memory import VectorMemory
 

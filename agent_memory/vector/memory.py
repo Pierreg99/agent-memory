@@ -12,7 +12,6 @@ import numpy as np
 
 from ..config.settings import VectorConfig
 from ..core.models import MemoryEntry, MemoryQuery
-from ..core.types import MemoryKind
 from .embeddings import Embedder, build_embedder
 
 
