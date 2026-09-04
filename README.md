@@ -40,6 +40,14 @@ for cm in pack.to_chat_messages():
   are optional).
 - **Fully tested** — 48 unit + integration tests covering every module.
 
+## Project Documentation
+
+- **[Architecture Guide](docs/architecture.md)** — Detailed subsystem architecture and design rationale.
+- **[Technical Plan & Design](PLAN.md)** — Architectural principles, pipeline execution flow, and testing strategy.
+- **[Progress Tracker](PROGRESS.md)** — Subsystem status matrix, test breakdown, and milestone tracking.
+- **[Changelog](CHANGELOG.md)** — Release notes and version history.
+- **[Roadmap](ROADMAP.md)** — Planned features for v0.2.0, v0.3.0, and v1.0.0.
+
 ## Layout
 
 ```
