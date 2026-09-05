@@ -58,10 +58,25 @@ class VectorMemory:
         self._entries.clear()
         self._vectors.clear()
 
+    def clear_session(self, session_id: str) -> None:
+        """Drop entries belonging to a single session; leave others intact."""
+        keep_e: list[MemoryEntry] = []
+        keep_v: list[np.ndarray] = []
+        for entry, vec in zip(self._entries, self._vectors):
+            if entry.session_id != session_id:
+                keep_e.append(entry)
+                keep_v.append(vec)
+        self._entries = keep_e
+        self._vectors = keep_v
+
     # ---- query -----------------------------------------------------------
 
     def query(self, q: MemoryQuery) -> list[MemoryEntry]:
-        """Return up to q.top_k entries most similar to q.query_text."""
+        """Return up to q.top_k entries most similar to q.query_text.
+
+        Filters by ``session_id``, ``kinds``, ``min_importance``,
+        ``metadata_filter``, and ``min_similarity`` (config).
+        """
         if not self._entries:
             return []
 
@@ -73,10 +88,12 @@ class VectorMemory:
         matrix = np.stack(self._vectors, axis=0)  # (N, D)
         sims = matrix @ query_vec  # (N,)
 
-        # Apply filters
+        # Apply filters (session, kind, importance, metadata, similarity)
         candidates: list[tuple[int, float]] = []
         kinds_set = set(q.kinds) if q.kinds else None
         for i, entry in enumerate(self._entries):
+            if q.session_id and entry.session_id != q.session_id:
+                continue
             if kinds_set and entry.kind not in kinds_set:
                 continue
             if entry.importance < q.min_importance:

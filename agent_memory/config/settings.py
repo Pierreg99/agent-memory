@@ -1,11 +1,12 @@
 """Pydantic-backed settings loader for the agent memory system."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Optional
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from ..core.types import (
     EmbeddingBackend,
@@ -25,7 +26,13 @@ class WindowConfig(BaseModel):
     @classmethod
     def _coerce_strategy(cls, v: Any) -> Any:
         if isinstance(v, str):
-            return WindowStrategy(v)
+            try:
+                return WindowStrategy(v)
+            except ValueError as e:
+                allowed = ", ".join(s.value for s in WindowStrategy)
+                raise ValueError(
+                    f"invalid window.strategy {v!r}; expected one of: {allowed}"
+                ) from e
         return v
 
 
@@ -53,7 +60,13 @@ class SummaryConfig(BaseModel):
     @classmethod
     def _coerce_backend(cls, v: Any) -> Any:
         if isinstance(v, str):
-            return SummarizerBackend(v)
+            try:
+                return SummarizerBackend(v)
+            except ValueError as e:
+                allowed = ", ".join(s.value for s in SummarizerBackend)
+                raise ValueError(
+                    f"invalid summary.backend {v!r}; expected one of: {allowed}"
+                ) from e
         return v
 
 
@@ -69,7 +82,13 @@ class VectorConfig(BaseModel):
     @classmethod
     def _coerce_backend(cls, v: Any) -> Any:
         if isinstance(v, str):
-            return EmbeddingBackend(v)
+            try:
+                return EmbeddingBackend(v)
+            except ValueError as e:
+                allowed = ", ".join(s.value for s in EmbeddingBackend)
+                raise ValueError(
+                    f"invalid vector.backend {v!r}; expected one of: {allowed}"
+                ) from e
         return v
 
 
@@ -97,10 +116,25 @@ class MemorySettings(BaseModel):
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "MemorySettings":
+        """Load settings from a YAML file.
+
+        Raises:
+            FileNotFoundError: if the path does not exist.
+            ValueError: if the file is empty of usable data or fails validation.
+        """
         path = Path(path)
+        if not path.is_file():
+            raise FileNotFoundError(f"memory config not found: {path}")
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
-        return cls.from_dict(data)
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"memory config must be a YAML mapping, got {type(data).__name__}"
+            )
+        try:
+            return cls.from_dict(data)
+        except ValidationError as e:
+            raise ValueError(f"invalid memory config in {path}: {e}") from e
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "MemorySettings":
@@ -114,12 +148,40 @@ _DEFAULT_PATH = Path(__file__).with_name("defaults.yaml")
 
 
 def load_settings(overrides: Optional[dict[str, Any]] = None) -> MemorySettings:
-    """Load defaults from defaults.yaml and apply overrides (deep-merged)."""
+    """Load defaults and apply overrides (deep-merged).
+
+    Resolution order:
+    1. Packaged ``defaults.yaml`` (always the base).
+    2. If ``MEMORY_CONFIG_PATH`` is set, deep-merge that YAML file on top.
+    3. Deep-merge the ``overrides`` dict last (highest precedence).
+
+    Raises:
+        FileNotFoundError: if ``MEMORY_CONFIG_PATH`` points at a missing file.
+        ValueError: if a config file fails validation.
+    """
     with _DEFAULT_PATH.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
+    env_path = os.environ.get("MEMORY_CONFIG_PATH")
+    if env_path:
+        p = Path(env_path)
+        if not p.is_file():
+            raise FileNotFoundError(
+                f"MEMORY_CONFIG_PATH does not exist: {env_path}"
+            )
+        with p.open("r", encoding="utf-8") as f:
+            env_data = yaml.safe_load(f) or {}
+        if not isinstance(env_data, dict):
+            raise ValueError(
+                f"MEMORY_CONFIG_PATH must be a YAML mapping, got "
+                f"{type(env_data).__name__}"
+            )
+        data = _deep_merge(data, env_data)
     if overrides:
         data = _deep_merge(data, overrides)
-    return MemorySettings.from_dict(data)
+    try:
+        return MemorySettings.from_dict(data)
+    except ValidationError as e:
+        raise ValueError(f"invalid memory settings: {e}") from e
 
 
 def _deep_merge(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:

@@ -1,8 +1,9 @@
 # =============================================================================
 # Agent Memory - Default configuration
 # =============================================================================
-# All behavior knobs live here. Override individual fields by passing a
-# dict to `AgentMemory.from_config(...)` or by setting MEMORY_CONFIG_PATH.
+# All behavior knobs live here. Override by:
+#   1) setting MEMORY_CONFIG_PATH to a YAML file (deep-merged on top), and/or
+#   2) passing a dict to AgentMemory.from_config(...) (highest precedence).
 
 # --- Context window ---------------------------------------------------------
 window:
