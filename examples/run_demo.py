@@ -1,7 +1,7 @@
 """End-to-end demo of the agent memory system.
 
 Run with:
-    PYTHONPATH=code python code/examples/run_demo.py
+    PYTHONPATH=. python examples/run_demo.py
 
 It simulates a multi-turn conversation that:
   1. Stores short-term turns in the persistent message log.

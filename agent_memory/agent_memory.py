@@ -63,12 +63,24 @@ class AgentMemory:
         cls,
         overrides: Optional[dict[str, Any]] = None,
     ) -> "AgentMemory":
-        """Build an AgentMemory from defaults + an optional overrides dict."""
+        """Build an AgentMemory from defaults + an optional overrides dict.
+
+        Defaults come from ``agent_memory/config/defaults.yaml``. If the
+        environment variable ``MEMORY_CONFIG_PATH`` points at a YAML file,
+        that file is loaded first (instead of the packaged defaults), then
+        ``overrides`` are deep-merged on top.
+        """
         settings = load_settings(overrides)
         return cls(settings=settings)
 
     @classmethod
     def from_yaml(cls, path: str) -> "AgentMemory":
+        """Build an AgentMemory from a YAML config file.
+
+        Raises:
+            FileNotFoundError: if ``path`` does not exist.
+            ValueError: if the YAML cannot be parsed into valid settings.
+        """
         settings = MemorySettings.from_yaml(path)
         return cls(settings=settings)
 
@@ -79,10 +91,14 @@ class AgentMemory:
         return self.settings.session.default_id
 
     def clear_session(self, session_id: Optional[str] = None) -> None:
+        """Remove messages, summaries, and long-term facts for one session.
+
+        Vector entries for that session are dropped; other sessions stay.
+        """
         sid = session_id or self.default_session
         self.store.clear_session(sid)
         if self.vector is not None:
-            self.vector.clear()
+            self.vector.clear_session(sid)
 
     # ---- ingest ---------------------------------------------------------
 
@@ -93,10 +109,27 @@ class AgentMemory:
         session_id: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
     ) -> Message:
-        """Add a single message to the conversation and persist it."""
+        """Add a single message to the conversation and persist it.
+
+        Raises:
+            ValueError: if ``role`` is not a known :class:`Role` value,
+                or if ``content`` is empty/whitespace-only.
+        """
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("message content must be a non-empty string")
         sid = session_id or self.default_session
+        if isinstance(role, Role):
+            resolved = role
+        else:
+            try:
+                resolved = Role(role)
+            except ValueError as e:
+                allowed = ", ".join(r.value for r in Role)
+                raise ValueError(
+                    f"invalid role {role!r}; expected one of: {allowed}"
+                ) from e
         msg = Message(
-            role=Role(role) if not isinstance(role, Role) else role,
+            role=resolved,
             content=content,
             metadata=metadata or {},
         )

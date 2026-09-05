@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Memory — overview</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121821;
+      --ink: #e6edf5;
+      --muted: #8b9bb0;
+      --accent: #5eead4;
+      --line: #1e2936;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: radial-gradient(1200px 600px at 10% -10%, #12202b 0%, var(--bg) 55%);
+      color: var(--ink);
+      line-height: 1.55;
+    }
+    main {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 3rem 1.25rem 4rem;
+    }
+    h1 {
+      font-size: 1.85rem;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.35rem;
+    }
+    .tag {
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+    }
+    p.lead { color: var(--muted); margin-top: 0.75rem; }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.1rem 1.25rem;
+      margin: 1.25rem 0;
+    }
+    h2 {
+      font-size: 1rem;
+      margin: 0 0 0.65rem;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-weight: 600;
+    }
+    ul { margin: 0; padding-left: 1.1rem; color: var(--ink); }
+    li { margin: 0.25rem 0; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code, pre {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+    }
+    pre {
+      background: #0a0e13;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+      overflow-x: auto;
+      color: #d7e3f0;
+    }
+    footer {
+      margin-top: 2rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="tag">agent-memory · 0.1.1</p>
+    <h1>Agent Memory</h1>
+    <p class="lead">
+      Token-aware windowing, summarization, RAG recall, and SQLite persistence
+      for LLM agents — one orchestrator, YAML config, OpenAI-style message packs.
+    </p>
+
+    <section>
+      <h2>Start</h2>
+<pre>pip install agent-memory
+
+from agent_memory import AgentMemory
+mem = AgentMemory.from_config()
+mem.add_user("Hi, I'm Alice.")
+pack = mem.prepare("Who am I?", system_prompt="Be helpful.")
+messages = pack.to_chat_messages()</pre>
+    </section>
+
+    <section>
+      <h2>Docs on GitHub</h2>
+      <ul>
+        <li><a href="https://github.com/Pierreg99/agent-memory/blob/main/README.md">README</a></li>
+        <li><a href="https://github.com/Pierreg99/agent-memory/blob/main/docs/architecture.md">Architecture</a></li>
+        <li><a href="https://github.com/Pierreg99/agent-memory/blob/main/docs/api.md">API</a></li>
+        <li><a href="https://github.com/Pierreg99/agent-memory/blob/main/docs/config.md">Config</a></li>
+        <li><a href="https://github.com/Pierreg99/agent-memory/blob/main/docs/cookbook.md">Cookbook</a></li>
+        <li><a href="https://github.com/Pierreg99/agent-memory/blob/main/CHANGELOG.md">Changelog</a></li>
+      </ul>
+    </section>
+
+    <footer>
+      MIT · Pierreg99 · open <code>docs/index.html</code> locally for this page.
+    </footer>
+  </main>
+</body>
+</html>

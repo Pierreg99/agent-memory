@@ -163,7 +163,8 @@ class LLMSummarizer:
         api_key = os.environ.get(self.llm_cfg.api_key_env)
         if not api_key:
             raise RuntimeError(
-                f"LLM summarizer requires {self.llm_cfg.api_key_env} in env"
+                f"LLM summarizer requires environment variable "
+                f"{self.llm_cfg.api_key_env} to be set to a non-empty API key"
             )
         payload = {
             "model": self.llm_cfg.model,

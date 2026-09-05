@@ -4,15 +4,23 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-memory"
-version = "0.1.0"
+version = "0.1.1"
 description = "A modular, configurable memory system for LLM agents — token-aware context windowing, automatic summarization, RAG-style long-term recall, and durable persistence."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [
-    { name = "MiniMax Agent" },
+    { name = "Pierreg99", email = "pierre@cryopg.it" },
 ]
-keywords = ["llm", "agent", "memory", "rag", "summarization", "context-window"]
+keywords = [
+    "llm",
+    "agent",
+    "memory",
+    "rag",
+    "summarization",
+    "context-window",
+    "sqlite",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -21,8 +29,10 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
 ]
 dependencies = [
     "pydantic>=2.0",
@@ -37,9 +47,32 @@ sentence-transformers = ["sentence-transformers>=2.2"]
 dev = [
     "pytest>=8.0",
 ]
+all = [
+    "tiktoken>=0.5",
+    "sentence-transformers>=2.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/Pierreg99/agent-memory"
+Repository = "https://github.com/Pierreg99/agent-memory"
+Issues = "https://github.com/Pierreg99/agent-memory/issues"
+Documentation = "https://github.com/Pierreg99/agent-memory/tree/main/docs"
+Changelog = "https://github.com/Pierreg99/agent-memory/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agent_memory"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/agent_memory",
+    "/tests",
+    "/examples",
+    "/docs",
+    "/README.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+    "/CONTRIBUTING.md",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
