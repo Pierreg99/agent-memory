@@ -9,10 +9,10 @@ from .summarizer import (
 )
 
 __all__ = [
-    "Summarizer",
     "ExtractiveSummarizer",
     "LLMSummarizer",
     "ResilientSummarizer",
+    "Summarizer",
     "build_summarizer",
     "to_memory_entry",
 ]

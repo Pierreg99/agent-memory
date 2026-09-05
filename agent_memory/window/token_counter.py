@@ -6,8 +6,9 @@ counter for accurate token accounting. The counter caches the per-message
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from functools import lru_cache
-from typing import Iterable, Protocol
+from typing import Protocol
 
 from ..config.settings import TokenConfig
 from ..core.models import Message
@@ -38,7 +39,7 @@ class HeuristicTokenCounter:
         if not text:
             return 0
         # Use max(1, ...) so a non-empty string always counts as >= 1 token.
-        return max(1, int(round(len(text) / self._chars_per_token)))
+        return max(1, round(len(text) / self._chars_per_token))
 
     def count_messages(self, messages: Iterable[Message]) -> int:
         total = 0

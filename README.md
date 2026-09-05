@@ -5,6 +5,10 @@ memory layer: token-aware context windowing, automatic summarization,
 RAG-style long-term recall, and durable persistence — all driven by
 YAML config.
 
+[![Changelog](https://img.shields.io/badge/Changelog-v0.1.0-blue.svg)](CHANGELOG.md)
+[![Roadmap](https://img.shields.io/badge/Roadmap-View-green.svg)](ROADMAP.md)
+[![Progress](https://img.shields.io/badge/Progress-100%25-brightgreen.svg)](PROGRESS.md)
+
 ## Quick start
 
 ```python
@@ -89,6 +93,14 @@ pip install pytest
 python -m pytest tests/ -v
 # 48 passed
 ```
+
+## Project Documentation
+
+For deeper details on development status, release history, and future development plans:
+- [CHANGELOG.md](CHANGELOG.md) — Version history and release notes.
+- [ROADMAP.md](ROADMAP.md) — Future milestones and feature plans.
+- [PROGRESS.md](PROGRESS.md) — System status and metric snapshots.
+- [docs/architecture.md](docs/architecture.md) — Detailed architectural design and data flow.
 
 ## Configuration
 
