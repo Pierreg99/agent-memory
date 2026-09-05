@@ -172,6 +172,14 @@ CI runs the suite on Python 3.10–3.13 (see `.github/workflows/ci.yml`).
 Optional static overview (local): open [`docs/index.html`](docs/index.html)
 in a browser.
 
+## Status
+
+**Ship-complete · v0.1.1** (PR #25 merged)
+
+- Session-safe vector memory, CI on Python 3.10–3.13, immersive docs suite.
+- Local pytest: 63 passed.
+- Docs: architecture, API, config, cookbook, optional `docs/index.html`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

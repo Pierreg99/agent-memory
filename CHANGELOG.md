@@ -33,10 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Package metadata: author `Pierreg99 <pierre@cryopg.it>`, project URLs,
   Python 3.13 classifier, optional `all` extra.
 - Example demo docstring path corrected to `examples/run_demo.py`.
+- README Status: ship-complete after PR #25 merge (63 tests green).
 
 ## [0.1.0] — 2026-09-05
 
 ### Added
 
-- Initial public release: orchestrator, windowing, summarization, vector
-  memory, SQLite persistence, defaults YAML, unit tests, and demo.
+- Initial `agent-memory` library: token-aware windowing, summarization,
+  vector recall, SQLite persistence, YAML config, and `MemoryPack` chat
+  export helpers.
