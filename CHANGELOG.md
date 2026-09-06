@@ -5,6 +5,39 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-09-06
+
+### Added
+
+- Durable vector-memory storage in SQLite with automatic index rehydration on startup.
+- Timestamp-based retention purge across messages, summaries, long-term facts,
+  and semantic vectors.
+- JSON-serializable `export_session()` lifecycle helper.
+- Regression tests for restart durability, session deletion, retention, strict
+  prompt budgets, model validation, multilingual extraction, and summary lifecycle.
+- Local reproducible benchmark at `benchmarks/run_memory_bench.py`.
+- Security and privacy guidance in `SECURITY.md`.
+
+### Fixed
+
+- Final `MemoryPack` assembly now trims retrieval, recent messages, summaries,
+  and pathological system prompts to remain within the configured prompt-side budget.
+- `summarize_old` no longer repeatedly re-summarizes message IDs already covered
+  by the latest summary.
+- Extractive summarization now splits Unicode/German text reliably instead of
+  requiring an ASCII capital after punctuation.
+- Vector memory is thread-safe, supports upserts, and can rebuild stale or
+  dimension-incompatible persisted embeddings.
+- Core Pydantic models validate importance, query limits, and cached token counts.
+- Windowing treats `keep_last_turns` as a preference and never uses it to break
+  the hard token ceiling.
+
+### Changed
+
+- Package version bumped to `0.2.0`.
+- Default configuration exposes `vector.persist_embeddings` and an opt-in
+  `retention` policy.
+
 ## [0.1.1] — 2026-09-05
 
 ### Fixed
