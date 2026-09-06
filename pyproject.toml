@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-memory"
-version = "0.1.1"
+version = "0.2.0"
 description = "A modular, configurable memory system for LLM agents — token-aware context windowing, automatic summarization, RAG-style long-term recall, and durable persistence."
 readme = "README.md"
 license = { text = "MIT" }
@@ -67,6 +67,7 @@ include = [
     "/agent_memory",
     "/tests",
     "/examples",
+    "/benchmarks",
     "/docs",
     "/README.md",
     "/LICENSE",
