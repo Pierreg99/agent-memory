@@ -37,10 +37,14 @@ def test_extractive_summarizer_respects_token_budget():
     )
     msgs = _msgs(
         [
-            "Apples are red and delicious. Oranges are orange and juicy. "
-            "Bananas are yellow and long. Grapes are small and sweet.",
-            "Pineapples are tropical and spiky. Mangoes are sweet and fibrous. "
-            "Kiwis are green and tangy. Watermelons are large and watery.",
+            (
+                "Apples are red and delicious. Oranges are orange and juicy. "
+                "Bananas are yellow and long. Grapes are small and sweet."
+            ),
+            (
+                "Pineapples are tropical and spiky. Mangoes are sweet and fibrous. "
+                "Kiwis are green and tangy. Watermelons are large and watery."
+            ),
         ]
     )
     summary, _ = s.summarize_messages(msgs, max_tokens=20)

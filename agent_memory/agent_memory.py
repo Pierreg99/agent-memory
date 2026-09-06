@@ -16,7 +16,8 @@ the conversation grows past `summary.trigger_when_tokens_over`.
 """
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional, Union
+from collections.abc import Iterable
+from typing import Any
 
 from .config.settings import MemorySettings, load_settings
 from .core.models import MemoryEntry, MemoryPack, MemoryQuery, Message
@@ -34,11 +35,11 @@ class AgentMemory:
     def __init__(
         self,
         settings: MemorySettings,
-        counter: Optional[TokenCounter] = None,
-        window: Optional[WindowManager] = None,
-        summarizer: Optional[Summarizer] = None,
-        store: Optional[MemoryStore] = None,
-        vector: Optional[VectorMemory] = None,
+        counter: TokenCounter | None = None,
+        window: WindowManager | None = None,
+        summarizer: Summarizer | None = None,
+        store: MemoryStore | None = None,
+        vector: VectorMemory | None = None,
     ) -> None:
         self.settings = settings
         self.counter = counter or build_counter(settings.tokens)
@@ -61,8 +62,8 @@ class AgentMemory:
     @classmethod
     def from_config(
         cls,
-        overrides: Optional[dict[str, Any]] = None,
-    ) -> "AgentMemory":
+        overrides: dict[str, Any] | None = None,
+    ) -> AgentMemory:
         """Build an AgentMemory from defaults + an optional overrides dict.
 
         Defaults come from ``agent_memory/config/defaults.yaml``. If the
@@ -74,7 +75,7 @@ class AgentMemory:
         return cls(settings=settings)
 
     @classmethod
-    def from_yaml(cls, path: str) -> "AgentMemory":
+    def from_yaml(cls, path: str) -> AgentMemory:
         """Build an AgentMemory from a YAML config file.
 
         Raises:
@@ -90,7 +91,7 @@ class AgentMemory:
     def default_session(self) -> str:
         return self.settings.session.default_id
 
-    def clear_session(self, session_id: Optional[str] = None) -> None:
+    def clear_session(self, session_id: str | None = None) -> None:
         """Remove messages, summaries, and long-term facts for one session.
 
         Vector entries for that session are dropped; other sessions stay.
@@ -104,10 +105,10 @@ class AgentMemory:
 
     def add(
         self,
-        role: Union[Role, str],
+        role: Role | str,
         content: str,
-        session_id: Optional[str] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        session_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Message:
         """Add a single message to the conversation and persist it.
 
@@ -139,7 +140,7 @@ class AgentMemory:
     def add_user(
         self,
         content: str,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
         **meta: Any,
     ) -> Message:
         return self.add(Role.USER, content, session_id, meta or None)
@@ -147,7 +148,7 @@ class AgentMemory:
     def add_assistant(
         self,
         content: str,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
         **meta: Any,
     ) -> Message:
         return self.add(Role.ASSISTANT, content, session_id, meta or None)
@@ -155,7 +156,7 @@ class AgentMemory:
     def add_system(
         self,
         content: str,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
         **meta: Any,
     ) -> Message:
         return self.add(Role.SYSTEM, content, session_id, meta or None)
@@ -163,9 +164,9 @@ class AgentMemory:
     def add_long_term(
         self,
         content: str,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
         importance: float = 1.0,
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MemoryEntry:
         """Store a long-term fact and add it to vector memory if enabled."""
         sid = session_id or self.default_session
@@ -185,7 +186,7 @@ class AgentMemory:
     def add_many_long_term(
         self,
         facts: Iterable[str],
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
         importance: float = 1.0,
     ) -> list[MemoryEntry]:
         return [self.add_long_term(f, session_id, importance) for f in facts]
@@ -195,8 +196,8 @@ class AgentMemory:
     def prepare(
         self,
         query_text: str,
-        session_id: Optional[str] = None,
-        system_prompt: Optional[str] = None,
+        session_id: str | None = None,
+        system_prompt: str | None = None,
     ) -> MemoryPack:
         """Assemble a `MemoryPack` ready to hand to an LLM.
 
@@ -213,7 +214,7 @@ class AgentMemory:
 
         # Optionally summarize the oldest chunk
         summary_entry = self.store.get_latest_summary(sid)
-        summary_text: Optional[str] = None
+        summary_text: str | None = None
         summary_covers: list[str] = []
         if summary_entry is not None:
             summary_text = summary_entry.content
@@ -273,7 +274,7 @@ class AgentMemory:
 
     # ---- introspection --------------------------------------------------
 
-    def stats(self, session_id: Optional[str] = None) -> dict[str, Any]:
+    def stats(self, session_id: str | None = None) -> dict[str, Any]:
         sid = session_id or self.default_session
         msgs = self.store.get_messages(sid)
         long_term = self.store.get_long_term(sid, limit=10_000)
@@ -300,7 +301,7 @@ class _NullStore:
         return []
 
     def add_summary(self, *a: Any, **kw: Any) -> None: ...
-    def get_latest_summary(self, *a: Any, **kw: Any) -> Optional[MemoryEntry]:
+    def get_latest_summary(self, *a: Any, **kw: Any) -> MemoryEntry | None:
         return None
 
     def add_long_term(self, entry: MemoryEntry) -> None: ...

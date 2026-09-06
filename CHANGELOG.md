@@ -22,9 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unknown window/summary/vector backends, and missing YAML paths.
 - CI workflow (`.github/workflows/ci.yml`) running pytest on Python
   3.10–3.13 plus a packaging import smoke job.
+- Project roadmap and milestone document (`ROADMAP.md`) outlining vision,
+  v0.1.1 delivered features, and v0.2.0 / v0.3.0 / v1.0.0 planned progress.
 - Documentation suite: refreshed README and architecture notes; new
-  `docs/api.md`, `docs/config.md`, `docs/cookbook.md`; `CHANGELOG.md`,
-  `CONTRIBUTING.md`; optional static `docs/index.html`.
+  `docs/api.md`, `docs/config.md`, `docs/cookbook.md`, `ROADMAP.md`;
+  `CHANGELOG.md`, `CONTRIBUTING.md`; optional static `docs/index.html`.
+- Codebase-wide proofreading, formatting refinements, and full zero-warning
+  `ruff` lint compliance.
 - Gap-filling tests for session isolation, metadata filters, config env,
   YAML loading, resilient summarizer fallback, and store helpers.
 

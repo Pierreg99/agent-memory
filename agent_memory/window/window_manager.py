@@ -14,11 +14,10 @@ the dropped messages (e.g. persist them, store a summary, etc.).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from ..config.settings import WindowConfig
 from ..core.models import Message
-from ..core.types import Role, WindowStrategy
+from ..core.types import WindowStrategy
 from .token_counter import TokenCounter, build_counter
 
 
@@ -38,7 +37,7 @@ class WindowManager:
     def __init__(
         self,
         config: WindowConfig,
-        counter: Optional[TokenCounter] = None,
+        counter: TokenCounter | None = None,
     ) -> None:
         self.config = config
         self.counter = counter or build_counter()
@@ -51,7 +50,7 @@ class WindowManager:
     def apply(
         self,
         messages: list[Message],
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> WindowResult:
         """Apply the configured strategy and return the windowed result."""
         if not messages:

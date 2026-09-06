@@ -4,7 +4,12 @@ from __future__ import annotations
 import pytest
 
 from agent_memory import AgentMemory
-from agent_memory.config.settings import MemorySettings, load_settings
+from agent_memory.config.settings import (
+    MemorySettings,
+    SummaryConfig,
+    VectorConfig,
+    load_settings,
+)
 from agent_memory.core.models import MemoryEntry, MemoryQuery
 from agent_memory.core.types import MemoryKind, Role
 from agent_memory.persistence.store import MemoryStore
@@ -13,7 +18,6 @@ from agent_memory.summary.summarizer import (
     LLMSummarizer,
     ResilientSummarizer,
 )
-from agent_memory.config.settings import SummaryConfig, VectorConfig
 from agent_memory.vector.memory import VectorMemory
 
 
