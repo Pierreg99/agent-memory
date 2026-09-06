@@ -1,55 +1,49 @@
 # =============================================================================
 # Agent Memory - Default configuration
 # =============================================================================
-# All behavior knobs live here. Override by:
-#   1) setting MEMORY_CONFIG_PATH to a YAML file (deep-merged on top), and/or
-#   2) passing a dict to AgentMemory.from_config(...) (highest precedence).
-
-# --- Context window ---------------------------------------------------------
 window:
-  strategy: sliding                 # sliding | truncate_oldest | summarize_old
-  max_tokens: 4000                  # Hard ceiling for the prompt we hand to the LLM
-  keep_last_turns: 12               # Always keep at least this many recent turns
-  reserve_for_response: 800         # Reserve this many tokens for the LLM's reply
-  pin_system_prompt: true           # System prompt is never dropped
+  strategy: sliding
+  max_tokens: 4000
+  keep_last_turns: 12
+  reserve_for_response: 800
+  pin_system_prompt: true
 
-# --- Token counting ---------------------------------------------------------
 tokens:
-  backend: heuristic                # heuristic | tiktoken
-  tiktoken_encoding: cl100k_base    # Used when backend == tiktoken
-  chars_per_token: 4                # Heuristic: 1 token ~= N chars
+  backend: heuristic
+  tiktoken_encoding: cl100k_base
+  chars_per_token: 4
 
-# --- Summarization ----------------------------------------------------------
 summary:
-  backend: extractive               # extractive | llm
-  trigger_when_tokens_over: 3000    # Summarize oldest turns when total > this
-  max_summary_tokens: 400           # Compress summary to <= this many tokens
-  min_messages_to_summarize: 4      # Don't summarize fewer than this many messages
-  # LLM backend settings (used when backend == llm)
+  backend: extractive
+  trigger_when_tokens_over: 3000
+  max_summary_tokens: 400
+  min_messages_to_summarize: 4
   llm:
     model: gpt-4o-mini
     api_key_env: OPENAI_API_KEY
     endpoint: https://api.openai.com/v1/chat/completions
     temperature: 0.2
 
-# --- Vector (RAG) memory ----------------------------------------------------
 vector:
   enabled: true
-  backend: hash                     # hash | sentence_transformers
-  dim: 128                          # Dimensionality of the embedding space
-  top_k: 4                          # How many facts to retrieve per query
-  min_similarity: 0.0               # Drop matches below this cosine similarity
-  # Optional sentence-transformers model (used when backend == sentence_transformers)
+  backend: hash
+  dim: 128
+  top_k: 4
+  min_similarity: 0.0
   model_name: all-MiniLM-L6-v2
+  persist_embeddings: true
 
-# --- Persistence ------------------------------------------------------------
 persistence:
   enabled: true
-  sqlite_path: ":memory:"           # ":memory:" for ephemeral, or a file path
+  sqlite_path: ":memory:"
   auto_commit: true
-  save_long_term_on_add: true       # Persist long-term facts automatically
+  save_long_term_on_add: true
 
-# --- Sessions ---------------------------------------------------------------
+retention:
+  enabled: false
+  days: 0
+  run_on_start: false
+
 session:
   default_id: default
-  clear_on_start: false             # If true, drop existing session data on init
+  clear_on_start: false
