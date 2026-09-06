@@ -100,7 +100,7 @@ PYTHONPATH=. python benchmarks/run_memory_bench.py
 ```
 
 CI runs the suite on Python 3.10–3.13 and performs a packaging/import smoke
-test. fileciteturn10file0L2-L2
+test.
 
 ## Documentation
 
@@ -121,7 +121,7 @@ test. fileciteturn10file0L2-L2
 The release adds durable vector rehydration, lifecycle/retention helpers,
 strict final prompt-budget fitting, summary coverage protection, multilingual
 extractive summarization, stronger model validation, benchmarks, and security
-privacy guidance.
+and privacy guidance.
 
 ## License
 
