@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field, ValidationError, field_validator
@@ -115,7 +115,7 @@ class MemorySettings(BaseModel):
     session: SessionConfig = Field(default_factory=SessionConfig)
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "MemorySettings":
+    def from_yaml(cls, path: str | Path) -> MemorySettings:
         """Load settings from a YAML file.
 
         Raises:
@@ -128,7 +128,7 @@ class MemorySettings(BaseModel):
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         if not isinstance(data, dict):
-            raise ValueError(
+            raise ValueError(  # noqa: TRY004
                 f"memory config must be a YAML mapping, got {type(data).__name__}"
             )
         try:
@@ -137,7 +137,7 @@ class MemorySettings(BaseModel):
             raise ValueError(f"invalid memory config in {path}: {e}") from e
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "MemorySettings":
+    def from_dict(cls, data: dict[str, Any]) -> MemorySettings:
         return cls.model_validate(data)
 
     def to_dict(self) -> dict[str, Any]:
@@ -147,7 +147,7 @@ class MemorySettings(BaseModel):
 _DEFAULT_PATH = Path(__file__).with_name("defaults.yaml")
 
 
-def load_settings(overrides: Optional[dict[str, Any]] = None) -> MemorySettings:
+def load_settings(overrides: dict[str, Any] | None = None) -> MemorySettings:
     """Load defaults and apply overrides (deep-merged).
 
     Resolution order:

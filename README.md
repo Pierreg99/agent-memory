@@ -166,19 +166,23 @@ CI runs the suite on Python 3.10–3.13 (see `.github/workflows/ci.yml`).
 | [docs/api.md](docs/api.md) | Public classes and methods |
 | [docs/config.md](docs/config.md) | Every config field and default |
 | [docs/cookbook.md](docs/cookbook.md) | Practical recipes |
+| [ROADMAP.md](ROADMAP.md) | Vision, current capabilities, and future milestones |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup and PR expectations |
 
 Optional static overview (local): open [`docs/index.html`](docs/index.html)
 in a browser.
 
-## Status
+## Status & Roadmap
 
 **Ship-complete · v0.1.1** (PR #25 merged)
 
-- Session-safe vector memory, CI on Python 3.10–3.13, immersive docs suite.
-- Local pytest: 63 passed.
-- Docs: architecture, API, config, cookbook, optional `docs/index.html`.
+- **Delivered:** Session-safe vector memory, resilient summarizer fallback, token-aware windowing, CI on Python 3.10–3.13, immersive docs suite.
+- **Local pytest:** 63 passed (100% green, ruff lint clean).
+- **Roadmap:**
+  - **v0.2.0:** Async API (`AsyncAgentMemory`), external vector store adapters (`pgvector`, `Qdrant`), memory decay / TTL.
+  - **v0.3.0:** Multi-agent shared memory, graph/hierarchical facts, telemetry hooks.
+  - See [ROADMAP.md](ROADMAP.md) for full development milestones and feature plans.
 
 ## License
 

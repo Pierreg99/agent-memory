@@ -17,13 +17,12 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterable, Iterator, Optional
 
 from ..core.models import MemoryEntry, Message
 from ..core.types import MemoryKind, Role
-
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
@@ -150,7 +149,7 @@ class MemoryStore:
                 ],
             )
 
-    def get_messages(self, session_id: str, limit: Optional[int] = None) -> list[Message]:
+    def get_messages(self, session_id: str, limit: int | None = None) -> list[Message]:
         with self._conn() as conn:
             cur = conn.execute(
                 "SELECT id, role, content, ts, metadata FROM messages "
@@ -185,7 +184,7 @@ class MemoryStore:
                 ),
             )
 
-    def get_latest_summary(self, session_id: str) -> Optional[MemoryEntry]:
+    def get_latest_summary(self, session_id: str) -> MemoryEntry | None:
         with self._conn() as conn:
             cur = conn.execute(
                 "SELECT id, content, source_ids, created_at FROM summaries "
@@ -242,7 +241,7 @@ class MemoryStore:
     # ---- file path helper ----------------------------------------------
 
     @staticmethod
-    def file_store(path: str | Path) -> "MemoryStore":
+    def file_store(path: str | Path) -> MemoryStore:
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
         return MemoryStore(path=str(p), auto_commit=True)

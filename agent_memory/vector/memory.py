@@ -6,13 +6,12 @@ filtering and importance-based filtering.
 """
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 import numpy as np
 
 from ..config.settings import VectorConfig
 from ..core.models import MemoryEntry, MemoryQuery
-from ..core.types import MemoryKind
 from .embeddings import Embedder, build_embedder
 
 
@@ -25,7 +24,7 @@ class VectorMemory:
     `add` / `query` interface.
     """
 
-    def __init__(self, config: VectorConfig, embedder: Optional[Embedder] = None) -> None:
+    def __init__(self, config: VectorConfig, embedder: Embedder | None = None) -> None:
         self.config = config
         self.embedder = embedder or build_embedder(config)
         # Ensure embedder dim matches config
@@ -98,9 +97,10 @@ class VectorMemory:
                 continue
             if entry.importance < q.min_importance:
                 continue
-            if q.metadata_filter:
-                if not all(entry.metadata.get(k) == v for k, v in q.metadata_filter.items()):
-                    continue
+            if q.metadata_filter and not all(
+                entry.metadata.get(k) == v for k, v in q.metadata_filter.items()
+            ):
+                continue
             if sims[i] < self.config.min_similarity:
                 continue
             candidates.append((i, float(sims[i])))

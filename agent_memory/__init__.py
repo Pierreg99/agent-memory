@@ -34,7 +34,7 @@ from .window.token_counter import (
 )
 from .window.window_manager import WindowManager
 
-__all__ = [
+__all__ = [  # noqa: RUF022
     # Top-level
     "AgentMemory",
     "MemorySettings",
