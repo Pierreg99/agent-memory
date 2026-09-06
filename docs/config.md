@@ -16,7 +16,7 @@ is always the base.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `strategy` | enum | `sliding` | `sliding`, `truncate_oldest`, `summarize_oldest` semantics are implemented by the window/orchestrator pipeline. |
+| `strategy` | enum | `sliding` | `sliding`, `truncate_oldest`, or `summarize_old`. |
 | `max_tokens` | int | `4000` | Total prompt-side hard ceiling before reserved response tokens. |
 | `keep_last_turns` | int | `12` | Soft preference; never overrides the hard ceiling. |
 | `reserve_for_response` | int | `800` | Reserved for the model response. |
