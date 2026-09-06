@@ -10,11 +10,10 @@ import requests
 
 from ..config.settings import LLMSummaryConfig, SummaryConfig
 from ..core.models import MemoryEntry, Message
-from ..core.types import MemoryKind
+from ..core.types import MemoryKind, Role
 
 
 _STOPWORDS = {
-    # English
     "a", "an", "the", "and", "or", "but", "if", "then", "else", "of", "to",
     "in", "on", "at", "by", "for", "with", "as", "is", "are", "was", "were",
     "be", "been", "being", "this", "that", "these", "those", "it", "its",
@@ -22,7 +21,6 @@ _STOPWORDS = {
     "have", "has", "had", "do", "does", "did", "not", "no", "so", "up", "out",
     "from", "into", "over", "under", "about", "than", "also", "just", "can",
     "could", "should", "would", "will", "may", "might", "must",
-    # German
     "der", "die", "das", "den", "dem", "des", "ein", "eine", "einer", "einem",
     "einen", "eines", "und", "oder", "aber", "wenn", "dann", "von", "zu", "in",
     "im", "auf", "an", "am", "für", "mit", "als", "ist", "sind", "war", "waren",
@@ -37,8 +35,6 @@ class Summarizer(Protocol):
     def summarize_messages(self, messages: list[Message], max_tokens: int) -> tuple[str, list[str]]: ...
 
 
-# Split after sentence punctuation without requiring an ASCII capital letter.
-# This keeps German, quoted text, and sentence-leading digits usable.
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 
@@ -119,9 +115,7 @@ class LLMSummarizer:
     def summarize_text(self, text: str, max_tokens: int) -> str:
         api_key = os.environ.get(self.llm_cfg.api_key_env)
         if not api_key:
-            raise RuntimeError(
-                f"LLM summarizer requires environment variable {self.llm_cfg.api_key_env} to be set"
-            )
+            raise RuntimeError(f"LLM summarizer requires environment variable {self.llm_cfg.api_key_env} to be set")
         payload = {
             "model": self.llm_cfg.model,
             "temperature": self.llm_cfg.temperature,
@@ -180,7 +174,7 @@ def to_memory_entry(summary: str, covered_ids: Iterable[str], session_id: str) -
     return MemoryEntry(
         kind=MemoryKind.SUMMARY,
         session_id=session_id,
-        role=MemoryKind.SUMMARY and None,
+        role=Role.SUMMARY,
         content=summary,
         source_message_ids=list(covered_ids),
     )
