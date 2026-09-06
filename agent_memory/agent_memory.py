@@ -1,21 +1,8 @@
-"""Top-level orchestrator that composes all memory subsystems.
-
-`AgentMemory` is the only object an application needs to interact with.
-It wires together the token counter, the window manager, the summarizer,
-the vector memory, and the persistent store, and exposes a small,
-ergonomic API:
-
-    mem = AgentMemory.from_config()                 # load defaults
-    mem.add_user("Hello")                            # ingest a turn
-    pack = mem.prepare("How should I respond?")     # build the LLM context
-    chat = pack.to_chat_messages()                   # hand to an LLM SDK
-    mem.add_assistant(chat_reply)                    # close the loop
-
-The orchestrator is also responsible for triggering summarization when
-the conversation grows past `summary.trigger_when_tokens_over`.
-"""
+"""Top-level orchestrator composing all memory subsystems."""
 from __future__ import annotations
 
+import threading
+import time
 from typing import Any, Iterable, Optional, Union
 
 from .config.settings import MemorySettings, load_settings
@@ -29,7 +16,7 @@ from .window.window_manager import WindowManager
 
 
 class AgentMemory:
-    """Composed agent memory system."""
+    """Composed agent memory system with durable semantic recall."""
 
     def __init__(
         self,
@@ -52,55 +39,49 @@ class AgentMemory:
             if settings.persistence.enabled
             else _NullStore()
         )
-        self.vector = vector or (
-            VectorMemory(settings.vector) if settings.vector.enabled else None
-        )
+        self.vector = vector or (VectorMemory(settings.vector) if settings.vector.enabled else None)
+        self._lifecycle_lock = threading.RLock()
 
-    # ---- factories -------------------------------------------------------
+        if settings.persistence.enabled and self.vector is not None and settings.vector.persist_embeddings:
+            self.vector.restore(self.store.get_vector_entries())
+        if settings.persistence.enabled and settings.session.clear_on_start:
+            self.clear_session()
+        if settings.persistence.enabled and settings.retention.enabled and settings.retention.run_on_start:
+            self.purge_expired()
 
     @classmethod
-    def from_config(
-        cls,
-        overrides: Optional[dict[str, Any]] = None,
-    ) -> "AgentMemory":
-        """Build an AgentMemory from defaults + an optional overrides dict.
-
-        Defaults come from ``agent_memory/config/defaults.yaml``. If the
-        environment variable ``MEMORY_CONFIG_PATH`` points at a YAML file,
-        that file is loaded first (instead of the packaged defaults), then
-        ``overrides`` are deep-merged on top.
-        """
-        settings = load_settings(overrides)
-        return cls(settings=settings)
+    def from_config(cls, overrides: Optional[dict[str, Any]] = None) -> "AgentMemory":
+        return cls(settings=load_settings(overrides))
 
     @classmethod
     def from_yaml(cls, path: str) -> "AgentMemory":
-        """Build an AgentMemory from a YAML config file.
-
-        Raises:
-            FileNotFoundError: if ``path`` does not exist.
-            ValueError: if the YAML cannot be parsed into valid settings.
-        """
-        settings = MemorySettings.from_yaml(path)
-        return cls(settings=settings)
-
-    # ---- session helpers ------------------------------------------------
+        return cls(settings=MemorySettings.from_yaml(path))
 
     @property
     def default_session(self) -> str:
         return self.settings.session.default_id
 
     def clear_session(self, session_id: Optional[str] = None) -> None:
-        """Remove messages, summaries, and long-term facts for one session.
-
-        Vector entries for that session are dropped; other sessions stay.
-        """
         sid = session_id or self.default_session
         self.store.clear_session(sid)
         if self.vector is not None:
             self.vector.clear_session(sid)
 
-    # ---- ingest ---------------------------------------------------------
+    def export_session(self, session_id: Optional[str] = None) -> dict[str, Any]:
+        sid = session_id or self.default_session
+        return self.store.export_session(sid)
+
+    def purge_expired(self, now: Optional[float] = None) -> dict[str, int]:
+        """Apply the configured retention policy to all persisted memory."""
+        if not self.settings.retention.enabled or self.settings.retention.days <= 0:
+            return {"messages": 0, "summaries": 0, "long_term": 0, "memory_vectors": 0}
+        cutoff = (time.time() if now is None else float(now)) - self.settings.retention.days * 86400
+        counts = self.store.purge_older_than(cutoff)
+        if self.vector is not None:
+            self.vector.clear()
+            if self.settings.vector.persist_embeddings:
+                self.vector.restore(self.store.get_vector_entries())
+        return counts
 
     def add(
         self,
@@ -109,55 +90,21 @@ class AgentMemory:
         session_id: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
     ) -> Message:
-        """Add a single message to the conversation and persist it.
-
-        Raises:
-            ValueError: if ``role`` is not a known :class:`Role` value,
-                or if ``content`` is empty/whitespace-only.
-        """
         if not isinstance(content, str) or not content.strip():
             raise ValueError("message content must be a non-empty string")
         sid = session_id or self.default_session
-        if isinstance(role, Role):
-            resolved = role
-        else:
-            try:
-                resolved = Role(role)
-            except ValueError as e:
-                allowed = ", ".join(r.value for r in Role)
-                raise ValueError(
-                    f"invalid role {role!r}; expected one of: {allowed}"
-                ) from e
-        msg = Message(
-            role=resolved,
-            content=content,
-            metadata=metadata or {},
-        )
+        resolved = role if isinstance(role, Role) else Role(role)
+        msg = Message(role=resolved, content=content, metadata=metadata or {})
         self.store.add_message(sid, msg)
         return msg
 
-    def add_user(
-        self,
-        content: str,
-        session_id: Optional[str] = None,
-        **meta: Any,
-    ) -> Message:
+    def add_user(self, content: str, session_id: Optional[str] = None, **meta: Any) -> Message:
         return self.add(Role.USER, content, session_id, meta or None)
 
-    def add_assistant(
-        self,
-        content: str,
-        session_id: Optional[str] = None,
-        **meta: Any,
-    ) -> Message:
+    def add_assistant(self, content: str, session_id: Optional[str] = None, **meta: Any) -> Message:
         return self.add(Role.ASSISTANT, content, session_id, meta or None)
 
-    def add_system(
-        self,
-        content: str,
-        session_id: Optional[str] = None,
-        **meta: Any,
-    ) -> Message:
+    def add_system(self, content: str, session_id: Optional[str] = None, **meta: Any) -> Message:
         return self.add(Role.SYSTEM, content, session_id, meta or None)
 
     def add_long_term(
@@ -167,7 +114,10 @@ class AgentMemory:
         importance: float = 1.0,
         metadata: Optional[dict[str, Any]] = None,
     ) -> MemoryEntry:
-        """Store a long-term fact and add it to vector memory if enabled."""
+        if not content or not content.strip():
+            raise ValueError("long-term memory content must be a non-empty string")
+        if not 0.0 <= importance <= 1.0:
+            raise ValueError("importance must be between 0 and 1")
         sid = session_id or self.default_session
         entry = MemoryEntry(
             kind=MemoryKind.LONG_TERM,
@@ -180,6 +130,8 @@ class AgentMemory:
         self.store.add_long_term(entry)
         if self.vector is not None:
             self.vector.add(entry)
+            if self.settings.vector.persist_embeddings:
+                self.store.add_vector_entry(entry)
         return entry
 
     def add_many_long_term(
@@ -190,36 +142,21 @@ class AgentMemory:
     ) -> list[MemoryEntry]:
         return [self.add_long_term(f, session_id, importance) for f in facts]
 
-    # ---- context assembly ----------------------------------------------
-
     def prepare(
         self,
         query_text: str,
         session_id: Optional[str] = None,
         system_prompt: Optional[str] = None,
     ) -> MemoryPack:
-        """Assemble a `MemoryPack` ready to hand to an LLM.
-
-        Steps:
-        1. Load all messages for the session from the store.
-        2. If the conversation exceeds the summary trigger threshold AND
-           strategy is `summarize_old`, summarize the oldest half.
-        3. Apply the window manager to pick the recent messages that fit.
-        4. Retrieve top-k long-term facts relevant to `query_text`.
-        5. Return everything bundled as a MemoryPack.
-        """
+        if not isinstance(query_text, str) or not query_text.strip():
+            raise ValueError("query_text must be a non-empty string")
         sid = session_id or self.default_session
         all_messages = self.store.get_messages(sid)
 
-        # Optionally summarize the oldest chunk
         summary_entry = self.store.get_latest_summary(sid)
-        summary_text: Optional[str] = None
-        summary_covers: list[str] = []
-        if summary_entry is not None:
-            summary_text = summary_entry.content
-            summary_covers = list(summary_entry.source_message_ids)
+        summary_text = summary_entry.content if summary_entry else None
+        summary_covers = list(summary_entry.source_message_ids) if summary_entry else []
 
-        # Summarize-old strategy: if total tokens over threshold, compress oldest
         total_tokens = self.counter.count_messages(all_messages)
         trigger = self.settings.summary.trigger_when_tokens_over
         if (
@@ -227,28 +164,31 @@ class AgentMemory:
             and total_tokens > trigger
             and len(all_messages) >= self.settings.summary.min_messages_to_summarize
         ):
-            # Skip the most recent quarter when choosing what to summarize.
-            n_recent = max(1, len(all_messages) // 4)
-            to_summarize = all_messages[:-n_recent] if n_recent < len(all_messages) else all_messages
-            new_summary, covered_ids = self.summarizer.summarize_messages(
-                to_summarize, self.settings.summary.max_summary_tokens
-            )
-            if new_summary:
-                entry = to_memory_entry(new_summary, covered_ids, sid)
-                self.store.add_summary(sid, entry)
-                summary_text = new_summary
-                summary_covers = covered_ids
+            with self._lifecycle_lock:
+                current_summary = self.store.get_latest_summary(sid)
+                covered = set(current_summary.source_message_ids) if current_summary else set()
+                candidate_messages = [m for m in all_messages if m.id not in covered]
+                if len(candidate_messages) >= self.settings.summary.min_messages_to_summarize:
+                    n_recent = max(1, len(candidate_messages) // 4)
+                    to_summarize = candidate_messages[:-n_recent] if n_recent < len(candidate_messages) else candidate_messages
+                    new_summary, covered_ids = self.summarizer.summarize_messages(
+                        to_summarize, self.settings.summary.max_summary_tokens
+                    )
+                    if new_summary and covered_ids:
+                        entry = to_memory_entry(new_summary, covered_ids, sid)
+                        self.store.add_summary(sid, entry)
+                        if self.vector is not None:
+                            self.vector.add(entry)
+                            if self.settings.vector.persist_embeddings:
+                                self.store.add_vector_entry(entry)
+                        summary_text = new_summary
+                        summary_covers = covered_ids
 
-        # Apply windowing
         result = self.window.apply(all_messages, system_prompt=system_prompt)
         recent = result.kept
-        # When the caller passes an explicit system_prompt, any stored system
-        # messages are redundant — drop them so the LLM only sees one system
-        # message at the head of the prompt.
         if system_prompt:
             recent = [m for m in recent if m.role != Role.SYSTEM]
 
-        # Retrieve long-term facts
         retrieved: list[MemoryEntry] = []
         if self.vector is not None:
             q = MemoryQuery(
@@ -271,8 +211,6 @@ class AgentMemory:
             budget_tokens=result.budget_tokens,
         )
 
-    # ---- introspection --------------------------------------------------
-
     def stats(self, session_id: Optional[str] = None) -> dict[str, Any]:
         sid = session_id or self.default_session
         msgs = self.store.get_messages(sid)
@@ -286,25 +224,29 @@ class AgentMemory:
             "budget_tokens": self.window.budget,
         }
 
+    def close(self) -> None:
+        close = getattr(self.store, "close", None)
+        if callable(close):
+            close()
+
 
 class _NullStore:
-    """No-op store used when persistence is disabled.
-
-    Implements only the methods AgentMemory actually calls, so we don't
-    have to maintain two parallel APIs.
-    """
-
     def add_message(self, *a: Any, **kw: Any) -> None: ...
     def add_messages(self, *a: Any, **kw: Any) -> None: ...
     def get_messages(self, *a: Any, **kw: Any) -> list[Message]:
         return []
-
     def add_summary(self, *a: Any, **kw: Any) -> None: ...
     def get_latest_summary(self, *a: Any, **kw: Any) -> Optional[MemoryEntry]:
         return None
-
-    def add_long_term(self, entry: MemoryEntry) -> None: ...
+    def add_long_term(self, *a: Any, **kw: Any) -> None: ...
     def get_long_term(self, *a: Any, **kw: Any) -> list[MemoryEntry]:
         return []
-
+    def add_vector_entry(self, *a: Any, **kw: Any) -> None: ...
+    def get_vector_entries(self, *a: Any, **kw: Any) -> list[MemoryEntry]:
+        return []
     def clear_session(self, *a: Any, **kw: Any) -> None: ...
+    def purge_older_than(self, *a: Any, **kw: Any) -> dict[str, int]:
+        return {"messages": 0, "summaries": 0, "long_term": 0, "memory_vectors": 0}
+    def export_session(self, *a: Any, **kw: Any) -> dict[str, Any]:
+        return {"session_id": a[0] if a else "default", "messages": [], "long_term": [], "vectors": [], "latest_summary": None}
+    def close(self) -> None: ...
