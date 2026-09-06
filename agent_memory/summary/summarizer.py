@@ -1,19 +1,4 @@
-"""Summarization engine.
-
-Two backends are provided:
-
-* ExtractiveSummarizer - a fast, no-LLM summarizer that picks the most
-  important sentences from a block of text using a small keyword-scoring
-  heuristic. Always available, zero external dependencies.
-
-* LLMSummarizer - a thin adapter that calls an OpenAI-compatible chat
-  completions endpoint. Falls back to a clear NotImplementedError if the
-  `requests` library is unavailable or the call fails, so callers can
-  gracefully fall back to extractive.
-
-A `Summarizer` Protocol is exported so users can plug in their own
-implementation (Claude, local LLM, etc.).
-"""
+"""Pluggable summarization backends with deterministic fallback behavior."""
 from __future__ import annotations
 
 import os
@@ -24,135 +9,107 @@ from typing import Iterable, Optional, Protocol
 import requests
 
 from ..config.settings import LLMSummaryConfig, SummaryConfig
-from ..core.models import Message, MemoryEntry
+from ..core.models import MemoryEntry, Message
 from ..core.types import MemoryKind
 
 
-# English stopwords for the extractive heuristic. Small list by design.
 _STOPWORDS = {
+    # English
     "a", "an", "the", "and", "or", "but", "if", "then", "else", "of", "to",
     "in", "on", "at", "by", "for", "with", "as", "is", "are", "was", "were",
     "be", "been", "being", "this", "that", "these", "those", "it", "its",
     "i", "you", "he", "she", "we", "they", "them", "my", "your", "our",
-    "have", "has", "had", "do", "does", "did", "not", "no", "so", "up",
-    "out", "from", "into", "over", "under", "about", "than", "also", "just",
-    "can", "could", "should", "would", "will", "may", "might", "must",
+    "have", "has", "had", "do", "does", "did", "not", "no", "so", "up", "out",
+    "from", "into", "over", "under", "about", "than", "also", "just", "can",
+    "could", "should", "would", "will", "may", "might", "must",
+    # German
+    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einer", "einem",
+    "einen", "eines", "und", "oder", "aber", "wenn", "dann", "von", "zu", "in",
+    "im", "auf", "an", "am", "für", "mit", "als", "ist", "sind", "war", "waren",
+    "sein", "nicht", "kein", "keine", "ich", "du", "er", "sie", "wir", "ihr", "mich",
+    "dich", "mein", "dein", "unser", "euer", "hat", "haben", "wird", "werden", "auch",
+    "nur", "noch", "über", "unter", "dass", "wie", "was",
 }
 
 
 class Summarizer(Protocol):
-    """Pluggable summarizer interface."""
-
     def summarize_text(self, text: str, max_tokens: int) -> str: ...
-    def summarize_messages(
-        self, messages: list[Message], max_tokens: int
-    ) -> tuple[str, list[str]]: ...
+    def summarize_messages(self, messages: list[Message], max_tokens: int) -> tuple[str, list[str]]: ...
 
 
-# ---------------------------------------------------------------------------
-# Extractive summarizer
-# ---------------------------------------------------------------------------
-
-
-_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
+# Split after sentence punctuation without requiring an ASCII capital letter.
+# This keeps German, quoted text, and sentence-leading digits usable.
+_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 
 def _split_sentences(text: str) -> list[str]:
     text = text.strip()
     if not text:
         return []
-    parts = _SENT_SPLIT.split(text)
-    return [p.strip() for p in parts if p.strip()]
+    return [p.strip() for p in _SENT_SPLIT.split(text) if p.strip()]
 
 
 def _tokenize(text: str) -> list[str]:
-    return [w.lower() for w in re.findall(r"\b\w+\b", text) if w.lower() not in _STOPWORDS]
+    return [w.lower() for w in re.findall(r"\b\w+\b", text, flags=re.UNICODE) if w.lower() not in _STOPWORDS]
 
 
 class ExtractiveSummarizer:
-    """Extractive summarizer using keyword-frequency scoring.
-
-    For each sentence, score = sum of (1 + log(freq(word))) for each
-    non-stopword. Top-N sentences are kept in their original order, where
-    N is chosen to fit within `max_tokens` (using the heuristic counter).
-    """
+    """Lightweight extractive summarizer using multilingual keyword scoring."""
 
     def __init__(self, config: Optional[SummaryConfig] = None) -> None:
         self.config = config or SummaryConfig()
-        # Local import to avoid a circular import
         from ..window.token_counter import HeuristicTokenCounter
-
         self._counter = HeuristicTokenCounter()
 
     def summarize_text(self, text: str, max_tokens: int) -> str:
+        if max_tokens <= 0:
+            return ""
         sentences = _split_sentences(text)
         if not sentences:
             return ""
         if len(sentences) == 1:
             return sentences[0]
 
-        # Score each sentence by keyword frequency
-        words = _tokenize(text)
-        freq = Counter(words)
-
-        scores: list[tuple[int, float]] = []  # (index, score)
-        for i, s in enumerate(sentences):
-            toks = _tokenize(s)
-            if not toks:
+        freq = Counter(_tokenize(text))
+        scores: list[tuple[int, float]] = []
+        for i, sentence in enumerate(sentences):
+            tokens = _tokenize(sentence)
+            if not tokens:
                 scores.append((i, 0.0))
                 continue
-            score = sum(1.0 + (0 if freq[t] <= 1 else (freq[t] - 1) ** 0.5) for t in toks)
-            # Normalize by length so long sentences don't dominate unfairly
-            scores.append((i, score / max(1, len(toks)) ** 0.5))
+            score = sum(1.0 + ((freq[token] - 1) ** 0.5 if freq[token] > 1 else 0.0) for token in tokens)
+            scores.append((i, score / max(1, len(tokens)) ** 0.5))
 
-        # Pick top sentences by score, then order them by their original index
         scores.sort(key=lambda x: x[1], reverse=True)
         chosen: list[tuple[int, str]] = []
         used = 0
         for idx, _ in scores:
-            s = sentences[idx]
-            tc = self._counter.count_text(s)
-            if used + tc > max_tokens and chosen:
+            sentence = sentences[idx]
+            token_count = self._counter.count_text(sentence)
+            if used + token_count > max_tokens and chosen:
                 continue
-            chosen.append((idx, s))
-            used += tc
+            chosen.append((idx, sentence))
+            used += token_count
             if used >= max_tokens:
                 break
         chosen.sort(key=lambda x: x[0])
-        return " ".join(s for _, s in chosen)
+        return " ".join(sentence for _, sentence in chosen)
 
-    def summarize_messages(
-        self, messages: list[Message], max_tokens: int
-    ) -> tuple[str, list[str]]:
-        if not messages:
+    def summarize_messages(self, messages: list[Message], max_tokens: int) -> tuple[str, list[str]]:
+        if not messages or len(messages) < self.config.min_messages_to_summarize:
             return "", []
-        if len(messages) < self.config.min_messages_to_summarize:
-            return "", []
-
-        # Join messages into one block for sentence-level scoring
         joined = "\n".join(f"{m.role.value}: {m.content}" for m in messages)
-        summary = self.summarize_text(joined, max_tokens)
-        covered_ids = [m.id for m in messages]
-        return summary, covered_ids
-
-
-# ---------------------------------------------------------------------------
-# LLM summarizer
-# ---------------------------------------------------------------------------
+        return self.summarize_text(joined, max_tokens), [m.id for m in messages]
 
 
 class LLMSummarizer:
-    """OpenAI-compatible chat-completions summarizer.
-
-    Reads the API key from `LLMSummaryConfig.api_key_env`. If the key is
-    missing or the request fails, raises a RuntimeError so the caller can
-    fall back to the extractive summarizer.
-    """
+    """OpenAI-compatible chat-completions summarizer."""
 
     SYSTEM_PROMPT = (
         "You are a concise summarizer. Compress the following conversation "
         "into a short, factual summary that preserves decisions, names, "
-        "numbers, and unresolved questions. Output plain text only."
+        "numbers, and unresolved questions. Preserve the input language where "
+        "practical. Output plain text only."
     )
 
     def __init__(self, config: Optional[SummaryConfig] = None) -> None:
@@ -163,8 +120,7 @@ class LLMSummarizer:
         api_key = os.environ.get(self.llm_cfg.api_key_env)
         if not api_key:
             raise RuntimeError(
-                f"LLM summarizer requires environment variable "
-                f"{self.llm_cfg.api_key_env} to be set to a non-empty API key"
+                f"LLM summarizer requires environment variable {self.llm_cfg.api_key_env} to be set"
             )
         payload = {
             "model": self.llm_cfg.model,
@@ -179,40 +135,24 @@ class LLMSummarizer:
             resp = requests.post(
                 self.llm_cfg.endpoint,
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 timeout=30,
             )
             resp.raise_for_status()
             data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
         except Exception as e:  # pragma: no cover - network
             raise RuntimeError(f"LLM summarization failed: {e}") from e
-        return data["choices"][0]["message"]["content"].strip()
 
-    def summarize_messages(
-        self, messages: list[Message], max_tokens: int
-    ) -> tuple[str, list[str]]:
+    def summarize_messages(self, messages: list[Message], max_tokens: int) -> tuple[str, list[str]]:
         if not messages:
             return "", []
         joined = "\n".join(f"{m.role.value}: {m.content}" for m in messages)
-        summary = self.summarize_text(joined, max_tokens)
-        return summary, [m.id for m in messages]
-
-
-# ---------------------------------------------------------------------------
-# Composite / fallback
-# ---------------------------------------------------------------------------
+        return self.summarize_text(joined, max_tokens), [m.id for m in messages]
 
 
 class ResilientSummarizer:
-    """Tries LLM first, falls back to extractive on any error.
-
-    This is the default summarizer used by the orchestrator when
-    `summary.backend == llm`, so the system remains functional even without
-    network or API access.
-    """
+    """Try LLM first and deterministically fall back to extractive."""
 
     def __init__(self, config: Optional[SummaryConfig] = None) -> None:
         self.config = config or SummaryConfig()
@@ -225,10 +165,7 @@ class ResilientSummarizer:
         except Exception:
             return self.extractive.summarize_text(text, max_tokens)
 
-    def summarize_messages(
-        self, messages: list[Message], max_tokens: int
-    ) -> tuple[str, list[str]]:
-        # LLM path
+    def summarize_messages(self, messages: list[Message], max_tokens: int) -> tuple[str, list[str]]:
         try:
             return self.llm.summarize_messages(messages, max_tokens)
         except Exception:
@@ -236,21 +173,14 @@ class ResilientSummarizer:
 
 
 def build_summarizer(config: SummaryConfig) -> Summarizer:
-    """Factory: build the right summarizer for a given config."""
-    if config.backend.value == "llm":
-        return ResilientSummarizer(config)
-    return ExtractiveSummarizer(config)
+    return ResilientSummarizer(config) if config.backend.value == "llm" else ExtractiveSummarizer(config)
 
 
-def to_memory_entry(
-    summary: str,
-    covered_ids: Iterable[str],
-    session_id: str,
-) -> MemoryEntry:
-    """Wrap a summary into a MemoryEntry for persistence."""
+def to_memory_entry(summary: str, covered_ids: Iterable[str], session_id: str) -> MemoryEntry:
     return MemoryEntry(
         kind=MemoryKind.SUMMARY,
         session_id=session_id,
+        role=MemoryKind.SUMMARY and None,
         content=summary,
         source_message_ids=list(covered_ids),
     )
