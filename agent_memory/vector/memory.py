@@ -12,12 +12,7 @@ from .embeddings import Embedder, build_embedder
 
 
 class VectorMemory:
-    """In-process vector index with durable-entry reconstruction support.
-
-    The index remains O(N), which is appropriate for small deployments. A
-    persistent MemoryStore can now provide the entries and embeddings so a
-    process restart does not discard semantic recall.
-    """
+    """In-process vector index with durable-entry reconstruction support."""
 
     def __init__(self, config: VectorConfig, embedder: Optional[Embedder] = None) -> None:
         self.config = config
@@ -29,21 +24,15 @@ class VectorMemory:
         self._index: dict[str, int] = {}
         self._lock = threading.RLock()
 
-    # ---- mutation ------------------------------------------------------
-
     def add(self, entry: MemoryEntry) -> None:
-        """Embed and upsert an entry."""
         if entry.embedding is None:
             entry.embedding = self.embedder.embed_entry(entry)
         self.add_embedded(entry)
 
     def add_embedded(self, entry: MemoryEntry) -> None:
-        """Insert an entry whose embedding is already materialized."""
         vec = np.asarray(entry.embedding or [], dtype=np.float32)
         if vec.ndim != 1 or len(vec) != self.config.dim:
-            raise ValueError(
-                f"embedding dimension mismatch: expected {self.config.dim}, got {len(vec)}"
-            )
+            raise ValueError(f"embedding dimension mismatch: expected {self.config.dim}, got {len(vec)}")
         norm = float(np.linalg.norm(vec))
         if norm > 0:
             vec = vec / norm
@@ -63,12 +52,17 @@ class VectorMemory:
             self.add(entry)
 
     def restore(self, entries: Iterable[MemoryEntry]) -> int:
-        """Restore pre-embedded entries and return the number loaded."""
+        """Restore persisted vectors, re-embedding stale/incompatible entries."""
         count = 0
         for entry in entries:
-            if entry.embedding is None:
-                continue
-            self.add_embedded(entry)
+            try:
+                if entry.embedding is None:
+                    self.add(entry)
+                else:
+                    self.add_embedded(entry)
+            except ValueError:
+                entry.embedding = self.embedder.embed_entry(entry)
+                self.add_embedded(entry)
             count += 1
         return count
 
@@ -80,19 +74,12 @@ class VectorMemory:
 
     def clear_session(self, session_id: str) -> None:
         with self._lock:
-            keep = [
-                (entry, vec)
-                for entry, vec in zip(self._entries, self._vectors)
-                if entry.session_id != session_id
-            ]
+            keep = [(entry, vec) for entry, vec in zip(self._entries, self._vectors) if entry.session_id != session_id]
             self._entries = [entry for entry, _ in keep]
             self._vectors = [vec for _, vec in keep]
             self._index = {entry.id: i for i, entry in enumerate(self._entries)}
 
-    # ---- query ---------------------------------------------------------
-
     def query(self, q: MemoryQuery) -> list[MemoryEntry]:
-        """Return up to q.top_k entries most similar to q.query_text."""
         if not q.query_text.strip() or q.top_k <= 0:
             return []
         with self._lock:
@@ -104,7 +91,6 @@ class VectorMemory:
                 query_vec = query_vec / norm
             matrix = np.stack(self._vectors, axis=0)
             sims = matrix @ query_vec
-
             candidates: list[tuple[int, float]] = []
             kinds_set = set(q.kinds) if q.kinds else None
             for i, entry in enumerate(self._entries):
@@ -114,14 +100,11 @@ class VectorMemory:
                     continue
                 if entry.importance < q.min_importance:
                     continue
-                if q.metadata_filter and not all(
-                    entry.metadata.get(k) == v for k, v in q.metadata_filter.items()
-                ):
+                if q.metadata_filter and not all(entry.metadata.get(k) == v for k, v in q.metadata_filter.items()):
                     continue
                 if sims[i] < self.config.min_similarity:
                     continue
                 candidates.append((i, float(sims[i])))
-
             candidates.sort(key=lambda x: (-x[1], self._entries[x[0]].created_at))
             return [self._entries[i] for i, _ in candidates[: q.top_k]]
 
