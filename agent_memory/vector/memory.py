@@ -1,113 +1,130 @@
-"""Vector-based long-term memory (RAG component).
-
-Stores MemoryEntry objects, embeds them, and retrieves the top-k most
-similar entries to a query by cosine similarity. Supports metadata
-filtering and importance-based filtering.
-"""
+"""Vector-based long-term memory (RAG component)."""
 from __future__ import annotations
 
+import threading
 from typing import Iterable, Optional
 
 import numpy as np
 
 from ..config.settings import VectorConfig
 from ..core.models import MemoryEntry, MemoryQuery
-from ..core.types import MemoryKind
 from .embeddings import Embedder, build_embedder
 
 
 class VectorMemory:
-    """In-process vector store with optional metadata filtering.
+    """In-process vector index with durable-entry reconstruction support.
 
-    Vectors and metadata live in a single list; queries are O(N) over
-    entries. This is appropriate for thousands-of-entries scale. For
-    larger scale, swap in FAISS / Qdrant / pgvector behind the same
-    `add` / `query` interface.
+    The index remains O(N), which is appropriate for small deployments. A
+    persistent MemoryStore can now provide the entries and embeddings so a
+    process restart does not discard semantic recall.
     """
 
     def __init__(self, config: VectorConfig, embedder: Optional[Embedder] = None) -> None:
         self.config = config
         self.embedder = embedder or build_embedder(config)
-        # Ensure embedder dim matches config
         if self.embedder.dim != self.config.dim:
-            # Prefer the embedder's actual dim when it's a real model
             self.config.dim = self.embedder.dim
         self._entries: list[MemoryEntry] = []
         self._vectors: list[np.ndarray] = []
+        self._index: dict[str, int] = {}
+        self._lock = threading.RLock()
 
-    # ---- mutation --------------------------------------------------------
+    # ---- mutation ------------------------------------------------------
 
     def add(self, entry: MemoryEntry) -> None:
-        """Embed and store an entry."""
+        """Embed and upsert an entry."""
         if entry.embedding is None:
             entry.embedding = self.embedder.embed_entry(entry)
-        vec = np.asarray(entry.embedding, dtype=np.float32)
-        # Normalize for cosine similarity via dot product
+        self.add_embedded(entry)
+
+    def add_embedded(self, entry: MemoryEntry) -> None:
+        """Insert an entry whose embedding is already materialized."""
+        vec = np.asarray(entry.embedding or [], dtype=np.float32)
+        if vec.ndim != 1 or len(vec) != self.config.dim:
+            raise ValueError(
+                f"embedding dimension mismatch: expected {self.config.dim}, got {len(vec)}"
+            )
         norm = float(np.linalg.norm(vec))
         if norm > 0:
             vec = vec / norm
         entry.embedding = vec.tolist()
-        self._entries.append(entry)
-        self._vectors.append(vec)
+        with self._lock:
+            existing = self._index.get(entry.id)
+            if existing is not None:
+                self._entries[existing] = entry
+                self._vectors[existing] = vec
+            else:
+                self._index[entry.id] = len(self._entries)
+                self._entries.append(entry)
+                self._vectors.append(vec)
 
     def add_many(self, entries: Iterable[MemoryEntry]) -> None:
-        for e in entries:
-            self.add(e)
+        for entry in entries:
+            self.add(entry)
+
+    def restore(self, entries: Iterable[MemoryEntry]) -> int:
+        """Restore pre-embedded entries and return the number loaded."""
+        count = 0
+        for entry in entries:
+            if entry.embedding is None:
+                continue
+            self.add_embedded(entry)
+            count += 1
+        return count
 
     def clear(self) -> None:
-        self._entries.clear()
-        self._vectors.clear()
+        with self._lock:
+            self._entries.clear()
+            self._vectors.clear()
+            self._index.clear()
 
     def clear_session(self, session_id: str) -> None:
-        """Drop entries belonging to a single session; leave others intact."""
-        keep_e: list[MemoryEntry] = []
-        keep_v: list[np.ndarray] = []
-        for entry, vec in zip(self._entries, self._vectors):
-            if entry.session_id != session_id:
-                keep_e.append(entry)
-                keep_v.append(vec)
-        self._entries = keep_e
-        self._vectors = keep_v
+        with self._lock:
+            keep = [
+                (entry, vec)
+                for entry, vec in zip(self._entries, self._vectors)
+                if entry.session_id != session_id
+            ]
+            self._entries = [entry for entry, _ in keep]
+            self._vectors = [vec for _, vec in keep]
+            self._index = {entry.id: i for i, entry in enumerate(self._entries)}
 
-    # ---- query -----------------------------------------------------------
+    # ---- query ---------------------------------------------------------
 
     def query(self, q: MemoryQuery) -> list[MemoryEntry]:
-        """Return up to q.top_k entries most similar to q.query_text.
-
-        Filters by ``session_id``, ``kinds``, ``min_importance``,
-        ``metadata_filter``, and ``min_similarity`` (config).
-        """
-        if not self._entries:
+        """Return up to q.top_k entries most similar to q.query_text."""
+        if not q.query_text.strip() or q.top_k <= 0:
             return []
+        with self._lock:
+            if not self._entries:
+                return []
+            query_vec = np.asarray(self.embedder.embed_text(q.query_text), dtype=np.float32)
+            norm = float(np.linalg.norm(query_vec))
+            if norm > 0:
+                query_vec = query_vec / norm
+            matrix = np.stack(self._vectors, axis=0)
+            sims = matrix @ query_vec
 
-        query_vec = np.asarray(self.embedder.embed_text(q.query_text), dtype=np.float32)
-        norm = float(np.linalg.norm(query_vec))
-        if norm > 0:
-            query_vec = query_vec / norm
-
-        matrix = np.stack(self._vectors, axis=0)  # (N, D)
-        sims = matrix @ query_vec  # (N,)
-
-        # Apply filters (session, kind, importance, metadata, similarity)
-        candidates: list[tuple[int, float]] = []
-        kinds_set = set(q.kinds) if q.kinds else None
-        for i, entry in enumerate(self._entries):
-            if q.session_id and entry.session_id != q.session_id:
-                continue
-            if kinds_set and entry.kind not in kinds_set:
-                continue
-            if entry.importance < q.min_importance:
-                continue
-            if q.metadata_filter:
-                if not all(entry.metadata.get(k) == v for k, v in q.metadata_filter.items()):
+            candidates: list[tuple[int, float]] = []
+            kinds_set = set(q.kinds) if q.kinds else None
+            for i, entry in enumerate(self._entries):
+                if q.session_id and entry.session_id != q.session_id:
                     continue
-            if sims[i] < self.config.min_similarity:
-                continue
-            candidates.append((i, float(sims[i])))
+                if kinds_set and entry.kind not in kinds_set:
+                    continue
+                if entry.importance < q.min_importance:
+                    continue
+                if q.metadata_filter and not all(
+                    entry.metadata.get(k) == v for k, v in q.metadata_filter.items()
+                ):
+                    continue
+                if sims[i] < self.config.min_similarity:
+                    continue
+                candidates.append((i, float(sims[i])))
 
-        candidates.sort(key=lambda x: x[1], reverse=True)
-        top = candidates[: max(0, int(q.top_k))]
-        return [self._entries[i] for i, _ in top]
+            candidates.sort(key=lambda x: (-x[1], self._entries[x[0]].created_at))
+            return [self._entries[i] for i, _ in candidates[: q.top_k]]
 
     def __len__(self) -> int:
-        return len(self._entries)
+        with self._lock:
+            return len(self._entries)
