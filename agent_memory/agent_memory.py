@@ -31,7 +31,6 @@ class AgentMemory:
         )
         self.vector = vector or (VectorMemory(settings.vector) if settings.vector.enabled else None)
         self._lifecycle_lock = threading.RLock()
-
         if settings.persistence.enabled and self.vector is not None and settings.vector.persist_embeddings:
             self.vector.restore(self.store.get_vector_entries())
         if settings.persistence.enabled and settings.session.clear_on_start:
@@ -116,7 +115,6 @@ class AgentMemory:
             raise ValueError("query_text must be a non-empty string")
         sid = session_id or self.default_session
         all_messages = self.store.get_messages(sid)
-
         summary_entry = self.store.get_latest_summary(sid)
         summary_text = summary_entry.content if summary_entry else None
         summary_covers = list(summary_entry.source_message_ids) if summary_entry else []
@@ -129,10 +127,10 @@ class AgentMemory:
             with self._lifecycle_lock:
                 current_summary = self.store.get_latest_summary(sid)
                 covered = set(current_summary.source_message_ids) if current_summary else set()
-                candidate_messages = [m for m in all_messages if m.id not in covered]
-                if len(candidate_messages) >= self.settings.summary.min_messages_to_summarize:
-                    n_recent = max(1, len(candidate_messages) // 4)
-                    to_summarize = candidate_messages[:-n_recent] if n_recent < len(candidate_messages) else candidate_messages
+                candidates = [m for m in all_messages if m.id not in covered]
+                if len(candidates) >= self.settings.summary.min_messages_to_summarize:
+                    n_recent = max(1, len(candidates) // 4)
+                    to_summarize = candidates[:-n_recent] if n_recent < len(candidates) else candidates
                     new_summary, covered_ids = self.summarizer.summarize_messages(
                         to_summarize, self.settings.summary.max_summary_tokens
                     )
@@ -155,16 +153,16 @@ class AgentMemory:
                             kinds=[MemoryKind.LONG_TERM, MemoryKind.SUMMARY], min_importance=0.0)
             retrieved = self.vector.query(q)
 
-        recent, summary_text, retrieved, used_tokens = self._fit_pack_to_budget(
+        recent, summary_text, retrieved, system_prompt, used_tokens = self._fit_pack_to_budget(
             recent, summary_text, retrieved, system_prompt
         )
-
         return MemoryPack(session_id=sid, system_prompt=system_prompt, recent_messages=recent,
                           summary=summary_text, summary_covers=summary_covers,
                           retrieved_facts=retrieved, used_tokens=used_tokens,
                           budget_tokens=self.window.budget)
 
-    def _render_system_context(self, system_prompt: Optional[str], summary: Optional[str],
+    @staticmethod
+    def _render_system_context(system_prompt: Optional[str], summary: Optional[str],
                                retrieved: list[MemoryEntry]) -> str:
         parts: list[str] = []
         if system_prompt:
@@ -178,38 +176,29 @@ class AgentMemory:
 
     def _fit_pack_to_budget(self, recent: list[Message], summary: Optional[str],
                             retrieved: list[MemoryEntry], system_prompt: Optional[str]):
-        """Fit the fully rendered prompt to the configured prompt-side budget."""
         budget = self.window.budget
 
         def total_tokens() -> int:
-            system = self._render_system_context(system_prompt, summary, retrieved)
-            system_tokens = self.counter.count_text(system) + (3 if system else 0)
+            rendered = self._render_system_context(system_prompt, summary, retrieved)
+            system_tokens = self.counter.count_text(rendered) + (3 if rendered else 0)
             return system_tokens + self.counter.count_messages(recent)
 
-        # Retrieval is supplemental, so trim least-ranked facts first.
         while retrieved and total_tokens() > budget:
             retrieved.pop()
-        # Preserve the newest conversational turns as long as possible.
         while recent and total_tokens() > budget:
             recent.pop(0)
-        # A summary is useful but must not violate the ceiling.
         if summary and total_tokens() > budget:
             fixed = self._render_system_context(system_prompt, None, retrieved)
             available = max(0, budget - (self.counter.count_text(fixed) + (3 if fixed else 0))
                             - self.counter.count_messages(recent))
-            summary = _truncate_text(summary, self.counter, max_tokens=available)
-        # A pathological oversized system prompt is the final case. Truncate it
-        # rather than returning a prompt larger than the configured ceiling.
+            summary = _truncate_text(summary, self.counter, available)
         if system_prompt and total_tokens() > budget:
             fixed = self._render_system_context(None, summary, retrieved)
             available = max(0, budget - (self.counter.count_text(fixed) + (3 if fixed else 0))
                             - self.counter.count_messages(recent))
-            system_prompt = _truncate_text(system_prompt, self.counter, max_tokens=available)
-            # Preserve the caller's reference semantics by replacing local value
-            # only for the final rendered budget calculation.
-            rendered = self._render_system_context(system_prompt, summary, retrieved)
-        used = total_tokens()
-        return recent, summary, retrieved, min(used, budget)
+            system_prompt = _truncate_text(system_prompt, self.counter, available)
+        used = min(total_tokens(), budget)
+        return recent, summary, retrieved, system_prompt, used
 
     def stats(self, session_id: Optional[str] = None) -> dict[str, Any]:
         sid = session_id or self.default_session
