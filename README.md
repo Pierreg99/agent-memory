@@ -1,184 +1,127 @@
 # Agent Memory
 
-A modular, configurable Python library that gives any LLM agent a real
-memory layer: token-aware context windowing, automatic summarization,
-RAG-style long-term recall, and durable persistence — driven by YAML
-config and a small public API.
+A modular, configurable Python library that gives LLM agents a memory layer:
+token-aware context windowing, automatic summarization, RAG-style long-term
+recall, and durable persistence behind a small public API.
 
-Hand the resulting `MemoryPack` to OpenAI, Anthropic, or any
+The resulting `MemoryPack` can be handed to OpenAI, Anthropic, or any
 chat-completions-compatible SDK via `pack.to_chat_messages()`.
 
 ## Quick start
 
 ```bash
 pip install agent-memory
-# or from a clone:
-# pip install -e ".[dev]"
 ```
 
 ```python
 from agent_memory import AgentMemory
 
-mem = AgentMemory.from_config()  # packaged defaults
+mem = AgentMemory.from_config({
+    "persistence": {"sqlite_path": "./agent_mem.db"},
+    "vector": {"persist_embeddings": True},
+})
 mem.add_system("You are a helpful assistant.")
 mem.add_user("Hi! I'm Alice and I love hiking.")
 mem.add_long_term("User's name is Alice", importance=0.9)
 mem.add_long_term("User enjoys hiking", importance=0.7)
 
-pack = mem.prepare(
-    "What do you know about me?",
-    system_prompt="You are helpful.",
-)
-
-# Hand to any OpenAI-style chat API
+pack = mem.prepare("What do you know about me?", system_prompt="You are helpful.")
 messages = pack.to_chat_messages()
-for cm in messages:
-    print(cm["role"], "::", cm["content"][:80])
-```
-
-Override knobs without touching files:
-
-```python
-mem = AgentMemory.from_config({
-    "window": {"max_tokens": 8000, "strategy": "summarize_old"},
-    "summary": {"backend": "llm"},
-    "vector": {"top_k": 5},
-    "persistence": {"sqlite_path": "./agent_mem.db"},
-})
-```
-
-Or load a YAML file:
-
-```python
-mem = AgentMemory.from_yaml("my_memory.yaml")
+mem.close()
 ```
 
 ## Features
 
-- **Token-aware context window** — `sliding`, `truncate_oldest`, and
-  `summarize_old` strategies with response-token reservation.
-- **Pluggable summarizer** — extractive by default; OpenAI-compatible LLM
-  adapter with automatic extractive fallback on missing keys or network errors.
-- **RAG-style long-term memory** — deterministic hash embeddings by default;
-  optional `sentence-transformers`. Queries are filtered by session, kind,
-  importance, metadata, and similarity.
-- **SQLite persistence** — per-thread connections; `:memory:` or file path.
-- **Thread-safe ingest path**, dependency-light core (`pydantic`, `numpy`,
-  `pyyaml`, `requests`). Optional: `tiktoken`, `sentence-transformers`.
-- **Typed public surface** — Pydantic models for messages, entries, queries,
-  and the assembled `MemoryPack`.
-
-## Installation
-
-```bash
-pip install agent-memory
-
-# Optional extras
-pip install "agent-memory[tiktoken]"
-pip install "agent-memory[sentence-transformers]"
-pip install "agent-memory[all]"
-```
-
-From source:
-
-```bash
-git clone https://github.com/Pierreg99/agent-memory.git
-cd agent-memory
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-```
+- **Token-aware context window** — sliding, truncate-oldest, and summarize-old strategies with response-token reservation and a final hard prompt-budget check.
+- **Pluggable summarizer** — extractive by default; OpenAI-compatible LLM adapter with deterministic fallback.
+- **RAG-style long-term memory** — deterministic hash embeddings by default; optional `sentence-transformers`; session and metadata filtering.
+- **Durable semantic recall** — vectors and their metadata can be persisted in SQLite and rehydrated after process restart.
+- **SQLite persistence** — thread-local connections, automatic rollback on errors, session clearing, retention purge, and JSON-serializable export.
+- **Typed public surface** — Pydantic models validate memory importance, query limits, and token counts.
+- **Multilingual extraction** — extractive summaries tolerate Unicode and German sentence structure.
 
 ## Configuration
 
-All behavior is YAML-driven. Resolution order for `AgentMemory.from_config`:
+Behavior is YAML-driven. Resolution order for `AgentMemory.from_config`:
 
-1. Packaged [`agent_memory/config/defaults.yaml`](agent_memory/config/defaults.yaml)
-2. Optional env file via `MEMORY_CONFIG_PATH` (deep-merged)
-3. The `overrides` dict argument (highest precedence)
+1. packaged `agent_memory/config/defaults.yaml`
+2. optional `MEMORY_CONFIG_PATH` file (deep-merged)
+3. `overrides` argument (highest precedence)
 
 | Area | Key knobs |
 |------|-----------|
 | Window | `strategy`, `max_tokens`, `keep_last_turns`, `reserve_for_response` |
-| Tokens | `backend` (`heuristic` \| `tiktoken`), `chars_per_token` |
-| Summary | `backend` (`extractive` \| `llm`), trigger / budget thresholds |
-| Vector | `enabled`, `backend` (`hash` \| `sentence_transformers`), `top_k` |
+| Tokens | `backend`, `tiktoken_encoding`, `chars_per_token` |
+| Summary | `backend`, trigger / budget thresholds, LLM settings |
+| Vector | `enabled`, `backend`, `top_k`, `min_similarity`, `persist_embeddings` |
 | Persistence | `enabled`, `sqlite_path`, `auto_commit` |
-| Session | `default_id` |
+| Retention | `enabled`, `days`, `run_on_start` |
+| Session | `default_id`, `clear_on_start` |
 
-Full reference: [docs/config.md](docs/config.md).
-
-## Public API (short)
+## Public API
 
 | Call | Purpose |
 |------|---------|
 | `AgentMemory.from_config(overrides?)` | Build from defaults + overrides |
-| `AgentMemory.from_yaml(path)` | Build from a YAML file |
+| `AgentMemory.from_yaml(path)` | Build from YAML |
 | `add_user` / `add_assistant` / `add_system` | Ingest turns |
-| `add_long_term` / `add_many_long_term` | Store RAG facts |
-| `prepare(query_text, …)` | Assemble a `MemoryPack` |
+| `add_long_term` / `add_many_long_term` | Store durable facts |
+| `prepare(query_text, …)` | Assemble a budget-fitted `MemoryPack` |
 | `MemoryPack.to_chat_messages()` | OpenAI-style messages list |
-| `stats()` / `clear_session()` | Introspection and cleanup |
-
-Details: [docs/api.md](docs/api.md). Patterns: [docs/cookbook.md](docs/cookbook.md).
+| `export_session()` | Export one session as JSON-serializable data |
+| `clear_session()` | Delete one session across all memory layers |
+| `purge_expired()` | Apply the configured retention policy |
+| `stats()` / `close()` | Introspection and cleanup |
 
 ## Layout
 
-```
+```text
 agent_memory/                # Library package
-├── agent_memory.py          # Orchestrator (AgentMemory)
-├── core/                    # Message, MemoryEntry, MemoryPack, enums
-├── config/                  # defaults.yaml + MemorySettings
-├── window/                  # Token counter + window manager
-├── summary/                 # Extractive + LLM summarizers
-├── vector/                  # Embeddings + VectorMemory
-└── persistence/             # SQLite MemoryStore
+├── agent_memory.py          # Orchestrator + lifecycle + budget fitting
+├── core/                    # Pydantic models + enums
+├── config/                  # settings + packaged defaults
+├── window/                  # token counter + window manager
+├── summary/                 # extractive + LLM summarizers
+├── vector/                  # embedders + in-process vector index
+└── persistence/             # SQLite store + persisted embeddings
 
-tests/                       # Unit + integration tests
-examples/run_demo.py         # Runnable multi-turn demo
-docs/                        # Architecture, API, config, cookbook
+tests/                       # Unit + integration + hardening tests
+benchmarks/                  # Reproducible local benchmarks
+docs/                        # Architecture, API, config, cookbook, reports
+SECURITY.md                  # Security and privacy guidance
 ```
 
-Design notes: [docs/architecture.md](docs/architecture.md).
-
-## Demo
-
-```bash
-PYTHONPATH=. python examples/run_demo.py
-```
-
-Tiny budgets are used on purpose so summarization and retrieval fire quickly.
-No external LLM call is made; the reply is stubbed.
-
-## Tests
+## Tests and benchmark
 
 ```bash
 pip install -e ".[dev]"
 python -m pytest tests/ -v
+PYTHONPATH=. python benchmarks/run_memory_bench.py
 ```
 
-CI runs the suite on Python 3.10–3.13 (see `.github/workflows/ci.yml`).
+CI runs the suite on Python 3.10–3.13 and performs a packaging/import smoke
+test. fileciteturn10file0L2-L2
 
 ## Documentation
 
 | Doc | Contents |
 |-----|----------|
-| [docs/architecture.md](docs/architecture.md) | Data flow, design choices, extension points |
-| [docs/api.md](docs/api.md) | Public classes and methods |
-| [docs/config.md](docs/config.md) | Every config field and default |
-| [docs/cookbook.md](docs/cookbook.md) | Practical recipes |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup and PR expectations |
-
-Optional static overview (local): open [`docs/index.html`](docs/index.html)
-in a browser.
+| `docs/architecture.md` | Data flow, design choices, extension points |
+| `docs/api.md` | Public classes and methods |
+| `docs/config.md` | Configuration reference |
+| `docs/cookbook.md` | Practical recipes |
+| `docs/reports/` | German/English architecture, production, security and evaluation reports |
+| `SECURITY.md` | Security and privacy guidance |
+| `CHANGELOG.md` | Release history |
 
 ## Status
 
-**Ship-complete · v0.1.1** (PR #25 merged)
+**v0.2.0 — reliability and production hardening**
 
-- Session-safe vector memory, CI on Python 3.10–3.13, immersive docs suite.
-- Local pytest: 63 passed.
-- Docs: architecture, API, config, cookbook, optional `docs/index.html`.
+The release adds durable vector rehydration, lifecycle/retention helpers,
+strict final prompt-budget fitting, summary coverage protection, multilingual
+extractive summarization, stronger model validation, benchmarks, and security
+privacy guidance.
 
 ## License
 
